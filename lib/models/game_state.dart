@@ -5,6 +5,7 @@ import 'game_map.dart';
 class GameState {
   final List<Character> party;
   int gold;
+  int healthPotions;
   int currentMapNumber;
   GameMap currentMap;
   DifficultyLevel difficulty;
@@ -14,7 +15,8 @@ class GameState {
 
   GameState({
     required this.party,
-    this.gold = 0,
+    this.gold = 50,
+    this.healthPotions = 0,
     this.currentMapNumber = 1,
     required this.currentMap,
     this.difficulty = DifficultyLevel.normal,
@@ -26,6 +28,7 @@ class GameState {
   Map<String, dynamic> toJson() => {
     'party': party.map((c) => c.toJson()).toList(),
     'gold': gold,
+    'healthPotions': healthPotions,
     'currentMapNumber': currentMapNumber,
     'currentMap': currentMap.toJson(),
     'difficulty': difficulty.index,
@@ -39,6 +42,7 @@ class GameState {
         .map((c) => Character.fromJson(c))
         .toList(),
     gold: json['gold'],
+    healthPotions: json['healthPotions'] ?? 0,
     currentMapNumber: json['currentMapNumber'],
     currentMap: GameMap.fromJson(json['currentMap']),
     difficulty: DifficultyLevel.values[json['difficulty']],

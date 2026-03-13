@@ -17,7 +17,7 @@ enum CharacterClass {
   templar,
 }
 
-enum NodeType { combat, shop, rest, treasure, boss, event, start }
+enum NodeType { combat, shop, rest, treasure, boss, event, start, recruit }
 
 enum EquipmentSlot { weapon, offhand, armor, helm, ring, amulet }
 

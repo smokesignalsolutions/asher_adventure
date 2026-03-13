@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +15,19 @@ class ShopScreen extends ConsumerStatefulWidget {
 }
 
 class _ShopScreenState extends ConsumerState<ShopScreen> {
+  late List<Equipment> _stockItems;
+  bool _stockGenerated = false;
+
+  List<Equipment> _generateStock(int mapNumber, String nodeId) {
+    final allItems = shopItemsByMap[mapNumber] ?? [];
+    // Seed by node ID so stock is consistent per shop visit
+    final shopRng = Random(nodeId.hashCode);
+    // Each item has a 65% chance of being in stock
+    return allItems.where((_) => shopRng.nextDouble() < 0.65).toList();
+  }
+
+  int _potionCost(int mapNumber) => 15 + (mapNumber * 10);
+
   @override
   Widget build(BuildContext context) {
     final gameState = ref.watch(gameStateProvider);
@@ -21,8 +35,17 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
       return const Scaffold(body: Center(child: Text('No game state')));
     }
 
+    // Generate stock once per shop visit
+    if (!_stockGenerated) {
+      _stockItems = _generateStock(
+        gameState.currentMapNumber,
+        gameState.currentMap.currentNodeId,
+      );
+      _stockGenerated = true;
+    }
+
     final theme = Theme.of(context);
-    final items = shopItemsByMap[gameState.currentMapNumber] ?? [];
+    final potionCost = _potionCost(gameState.currentMapNumber);
 
     return Scaffold(
       appBar: AppBar(
@@ -45,26 +68,73 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
+            child: ListView(
               padding: const EdgeInsets.all(16),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final canAfford = gameState.gold >= item.value;
-
-                return Card(
+              children: [
+                // --- Potions section ---
+                Card(
+                  color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3),
                   child: ListTile(
-                    title: Text(item.name),
-                    subtitle: Text(_itemStats(item)),
+                    leading: Icon(
+                      Icons.local_drink,
+                      color: Colors.red.shade400,
+                      size: 28,
+                    ),
+                    title: Row(
+                      children: [
+                        const Text('Health Potion'),
+                        const SizedBox(width: 8),
+                        if (gameState.healthPotions > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Owned: ${gameState.healthPotions}',
+                              style: theme.textTheme.labelSmall,
+                            ),
+                          ),
+                      ],
+                    ),
+                    subtitle: const Text('Heals 40% of a character\'s max HP'),
                     trailing: FilledButton(
-                      onPressed: canAfford
-                          ? () => _showEquipDialog(item)
+                      onPressed: gameState.gold >= potionCost
+                          ? () => _buyPotion(potionCost)
                           : null,
-                      child: Text('${item.value}g'),
+                      child: Text('${potionCost}g'),
                     ),
                   ),
-                );
-              },
+                ),
+                const SizedBox(height: 8),
+                if (_stockItems.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(
+                      child: Text(
+                        'No equipment in stock today.',
+                        style: TextStyle(fontStyle: FontStyle.italic),
+                      ),
+                    ),
+                  ),
+                // --- Equipment section ---
+                ..._stockItems.map((item) {
+                  final canAfford = gameState.gold >= item.value;
+                  return Card(
+                    child: ListTile(
+                      title: Text(item.name),
+                      subtitle: Text(_itemStats(item)),
+                      trailing: FilledButton(
+                        onPressed: canAfford
+                            ? () => _showEquipDialog(item)
+                            : null,
+                        child: Text('${item.value}g'),
+                      ),
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
           Padding(
@@ -79,6 +149,13 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _buyPotion(int cost) {
+    ref.read(gameStateProvider.notifier).buyPotion(cost);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Bought a Health Potion!')),
     );
   }
 
@@ -138,11 +215,11 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
     final parts = <String>[];
     parts.add(item.slot.name);
     parts.add('(${item.rarity.name})');
-    if (item.attackBonus > 0) parts.add('+${item.attackBonus} ATK');
-    if (item.defenseBonus > 0) parts.add('+${item.defenseBonus} DEF');
-    if (item.hpBonus > 0) parts.add('+${item.hpBonus} HP');
-    if (item.speedBonus > 0) parts.add('+${item.speedBonus} SPD');
-    if (item.magicBonus > 0) parts.add('+${item.magicBonus} MAG');
+    if (item.attackBonus != 0) parts.add('${item.attackBonus > 0 ? "+" : ""}${item.attackBonus} ATK');
+    if (item.defenseBonus != 0) parts.add('${item.defenseBonus > 0 ? "+" : ""}${item.defenseBonus} DEF');
+    if (item.hpBonus != 0) parts.add('${item.hpBonus > 0 ? "+" : ""}${item.hpBonus} HP');
+    if (item.speedBonus != 0) parts.add('${item.speedBonus > 0 ? "+" : ""}${item.speedBonus} SPD');
+    if (item.magicBonus != 0) parts.add('${item.magicBonus > 0 ? "+" : ""}${item.magicBonus} MAG');
     return parts.join(' ');
   }
 }

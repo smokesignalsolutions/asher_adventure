@@ -27,14 +27,15 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
     setState(() {
       if (_selectedClasses.contains(cls)) {
         _selectedClasses.remove(cls);
-      } else if (_selectedClasses.length < 4) {
+      } else {
+        _selectedClasses.clear();
         _selectedClasses.add(cls);
       }
     });
   }
 
   Future<void> _startGame() async {
-    if (_selectedClasses.length != 4) return;
+    if (_selectedClasses.length != 1) return;
 
     await ref.read(gameStateProvider.notifier).startNewGame(
       _selectedClasses,
@@ -49,7 +50,7 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Choose Your Party')),
+      appBar: AppBar(title: const Text('Choose Your Hero')),
       body: Column(
         children: [
           Padding(
@@ -73,7 +74,7 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Select 4 classes (${_selectedClasses.length}/4)',
+              'Select your starting class',
               style: theme.textTheme.titleMedium,
             ),
           ),
@@ -124,7 +125,7 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
             child: SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _selectedClasses.length == 4 ? _startGame : null,
+                onPressed: _selectedClasses.length == 1 ? _startGame : null,
                 child: const Text('Begin Adventure!'),
               ),
             ),

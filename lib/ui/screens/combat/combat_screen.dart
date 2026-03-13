@@ -2,6 +2,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../data/ability_icons.dart';
+import '../../widgets/idle_animated_sprite.dart';
 import '../../../data/sprite_data.dart';
 import '../../../models/ability.dart';
 import '../../../models/character.dart';
@@ -46,6 +48,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
   CombatState? _combat;
   bool _waitingForInput = false;
   Ability? _selectedAbility;
+  bool _potionMode = false;
   final _logController = ScrollController();
 
   // Attack line overlay
@@ -275,6 +278,38 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       _combat!.combatLog.add(log);
       _attackLines = lines;
       _waitingForInput = false;
+      _selectedAbility = null;
+    });
+    _scrollLog();
+    _animateLines(holdMs: 300, onDone: _advanceTurn);
+  }
+
+  void _usePotion(Character target) {
+    if (_combat == null) return;
+    final gameState = ref.read(gameStateProvider);
+    if (gameState == null || gameState.healthPotions <= 0) return;
+
+    final current = _combat!.currentCombatant;
+    final char = _combat!.allies.firstWhere((c) => c.id == current.id);
+
+    final healAmount = (target.totalMaxHp * 0.4).round();
+    final before = target.currentHp;
+    target.currentHp = min(target.totalMaxHp, target.currentHp + healAmount);
+    final actualHeal = target.currentHp - before;
+
+    ref.read(gameStateProvider.notifier).usePotion();
+
+    final lines = <_AttackLineData>[];
+    if (actualHeal > 0) {
+      lines.add(_AttackLineData(char.id, target.id, actualHeal, true, false));
+    }
+
+    setState(() {
+      _combat!.combatLog.add(
+          '${char.name} uses a Health Potion on ${target.name}! (+$actualHeal HP)');
+      _attackLines = lines;
+      _waitingForInput = false;
+      _potionMode = false;
       _selectedAbility = null;
     });
     _scrollLog();
@@ -523,16 +558,22 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                         children: _combat!.allies.map((ally) {
                           final isCurrentTurn =
                               currentCombatant?.id == ally.id;
-                          final isHealTarget = _selectedAbility != null &&
+                          final isHealTarget = (_selectedAbility != null &&
                               _selectedAbility!.damage < 0 &&
                               _selectedAbility!.targetType ==
                                   AbilityTarget.singleAlly &&
-                              ally.isAlive;
+                              ally.isAlive) ||
+                              (_potionMode && ally.isAlive);
                           return Flexible(
                             child: GestureDetector(
                               onTap: isHealTarget
-                                  ? () =>
-                                      _useAbility(_selectedAbility!, ally)
+                                  ? () {
+                                      if (_potionMode) {
+                                        _usePotion(ally);
+                                      } else {
+                                        _useAbility(_selectedAbility!, ally);
+                                      }
+                                    }
                                   : null,
                               child: _buildAllyWidget(
                                   theme, ally, isCurrentTurn, isHealTarget),
@@ -633,17 +674,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           Flexible(
             child: Opacity(
               opacity: ally.isAlive ? 1.0 : 0.3,
-              child: Image.asset(
-                spritePath,
-                width: spriteSize,
-                height: spriteSize,
-                filterQuality: FilterQuality.none,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: spriteSize,
-                  height: spriteSize,
-                  color: theme.colorScheme.primaryContainer,
-                  child: Icon(Icons.person, size: spriteSize * 0.5),
-                ),
+              child: IdleAnimatedSprite(
+                imagePath: spritePath,
+                size: spriteSize,
+                phaseOffset: ally.id.hashCode.toDouble(),
+                animate: ally.isAlive,
               ),
             ),
           ),
@@ -723,17 +758,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           Flexible(
             child: Opacity(
               opacity: enemy.isAlive ? 1.0 : 0.3,
-              child: Image.asset(
-                spritePath,
-                width: spriteSize,
-                height: spriteSize,
-                filterQuality: FilterQuality.none,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: spriteSize,
-                  height: spriteSize,
-                  color: theme.colorScheme.errorContainer,
-                  child: Icon(Icons.dangerous, size: spriteSize * 0.5),
-                ),
+              child: IdleAnimatedSprite(
+                imagePath: spritePath,
+                size: spriteSize,
+                phaseOffset: enemy.id.hashCode.toDouble(),
+                animate: enemy.isAlive,
               ),
             ),
           ),
@@ -816,9 +845,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  _selectedAbility == null
-                      ? '${char.name} - Choose ability'
-                      : '${char.name} - Choose target',
+                  _potionMode
+                      ? '${char.name} - Choose potion target'
+                      : _selectedAbility == null
+                          ? '${char.name} - Choose ability'
+                          : '${char.name} - Choose target',
                   style: theme.textTheme.bodySmall
                       ?.copyWith(fontWeight: FontWeight.bold),
                   overflow: TextOverflow.ellipsis,
@@ -827,70 +858,175 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             ],
           ),
           const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: abilities.map((ability) {
-              final isSelected = _selectedAbility?.name == ability.name;
-              final canUse = ability.isAvailable;
-
-              return ActionChip(
-                avatar: isSelected
-                    ? Icon(Icons.gps_fixed,
-                        size: 14, color: theme.colorScheme.onPrimary)
-                    : ability.damage < 0
-                        ? Icon(Icons.favorite,
-                            size: 14,
-                            color: canUse ? Colors.green : Colors.grey)
-                        : null,
-                label: Text(ability.name),
-                backgroundColor: isSelected
-                    ? theme.colorScheme.primary
-                    : !canUse
-                        ? theme.colorScheme.surfaceContainerHighest
-                        : null,
-                labelStyle: TextStyle(
-                  color: isSelected
-                      ? theme.colorScheme.onPrimary
-                      : !canUse
-                          ? theme.colorScheme.onSurface
-                              .withValues(alpha: 0.4)
-                          : null,
-                  fontSize: 12,
-                ),
-                onPressed: canUse
-                    ? () {
-                        setState(() => _selectedAbility = ability);
-                        if (ability.targetType == AbilityTarget.self) {
-                          _useAbility(ability, char);
-                        } else if (ability.targetType ==
-                                AbilityTarget.allEnemies ||
-                            ability.targetType ==
-                                AbilityTarget.allAllies) {
-                          _useAbility(ability, null);
-                        } else if (ability.targetType ==
-                            AbilityTarget.singleEnemy) {
-                          final alive = _combat!.enemies
-                              .where((e) => e.isAlive)
-                              .toList();
-                          if (alive.length == 1) {
-                            _useAbility(ability, alive.first);
-                          }
-                        } else if (ability.targetType ==
-                            AbilityTarget.singleAlly) {
-                          final alive = _combat!.allies
-                              .where((a) => a.isAlive)
-                              .toList();
-                          if (alive.length == 1) {
-                            _useAbility(ability, alive.first);
-                          }
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Potion button
+                if ((ref.read(gameStateProvider)?.healthPotions ?? 0) > 0)
+                  _buildAbilityBox(
+                    theme: theme,
+                    label: 'Potion (${ref.read(gameStateProvider)!.healthPotions})',
+                    iconWidget: Icon(
+                      Icons.local_drink,
+                      size: 80,
+                      color: _potionMode
+                          ? theme.colorScheme.onTertiary
+                          : Colors.red.shade400,
+                    ),
+                    isSelected: _potionMode,
+                    canUse: true,
+                    selectedColor: theme.colorScheme.tertiary,
+                    onTap: () {
+                      setState(() {
+                        _potionMode = !_potionMode;
+                        _selectedAbility = null;
+                      });
+                      if (_potionMode) {
+                        final alive = _combat!.allies
+                            .where((a) => a.isAlive)
+                            .toList();
+                        if (alive.length == 1) {
+                          _usePotion(alive.first);
                         }
                       }
-                    : null,
-              );
-            }).toList(),
+                    },
+                  ),
+                // Ability boxes
+                ...abilities.map((ability) {
+                  final isSelected =
+                      _selectedAbility?.name == ability.name;
+                  final canUse = ability.isAvailable;
+
+                  return _buildAbilityBox(
+                    theme: theme,
+                    label: ability.name,
+                    iconWidget: Image.asset(
+                      abilityIconPath(ability.name),
+                      width: 96,
+                      height: 96,
+                      filterQuality: FilterQuality.none,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Icon(
+                        ability.damage < 0
+                            ? Icons.favorite
+                            : Icons.auto_awesome,
+                        size: 28,
+                      ),
+                    ),
+                    isSelected: isSelected,
+                    canUse: canUse,
+                    onTap: canUse
+                        ? () {
+                            setState(() {
+                              _selectedAbility = ability;
+                              _potionMode = false;
+                            });
+                            if (ability.targetType ==
+                                AbilityTarget.self) {
+                              _useAbility(ability, char);
+                            } else if (ability.targetType ==
+                                    AbilityTarget.allEnemies ||
+                                ability.targetType ==
+                                    AbilityTarget.allAllies) {
+                              _useAbility(ability, null);
+                            } else if (ability.targetType ==
+                                AbilityTarget.singleEnemy) {
+                              final alive = _combat!.enemies
+                                  .where((e) => e.isAlive)
+                                  .toList();
+                              if (alive.length == 1) {
+                                _useAbility(ability, alive.first);
+                              }
+                            } else if (ability.targetType ==
+                                AbilityTarget.singleAlly) {
+                              final alive = _combat!.allies
+                                  .where((a) => a.isAlive)
+                                  .toList();
+                              if (alive.length == 1) {
+                                _useAbility(ability, alive.first);
+                              }
+                            }
+                          }
+                        : null,
+                  );
+                }),
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  // -- Ability box widget ---------------------------------------------------
+  Widget _buildAbilityBox({
+    required ThemeData theme,
+    required String label,
+    required Widget iconWidget,
+    required bool isSelected,
+    required bool canUse,
+    Color? selectedColor,
+    VoidCallback? onTap,
+  }) {
+    final bgColor = isSelected
+        ? (selectedColor ?? theme.colorScheme.primary)
+        : !canUse
+            ? theme.colorScheme.surfaceContainerHighest
+            : theme.colorScheme.surfaceContainerHigh;
+    final fgColor = isSelected
+        ? (selectedColor != null
+            ? theme.colorScheme.onTertiary
+            : theme.colorScheme.onPrimary)
+        : !canUse
+            ? theme.colorScheme.onSurface.withValues(alpha: 0.4)
+            : theme.colorScheme.onSurface;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Opacity(
+        opacity: canUse ? 1.0 : 0.5,
+        child: Container(
+          width: 170,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? (selectedColor ?? theme.colorScheme.primary)
+                  : theme.colorScheme.outline.withValues(alpha: 0.3),
+              width: isSelected ? 3 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: fgColor,
+                  height: 1.2,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: 120,
+                height: 120,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: iconWidget,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

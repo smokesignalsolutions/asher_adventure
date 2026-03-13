@@ -76,6 +76,18 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     await _autoSave();
   }
 
+  GameState _refreshState() => GameState(
+    party: state!.party,
+    gold: state!.gold,
+    healthPotions: state!.healthPotions,
+    currentMapNumber: state!.currentMapNumber,
+    currentMap: state!.currentMap,
+    difficulty: state!.difficulty,
+    totalEnemiesDefeated: state!.totalEnemiesDefeated,
+    totalGoldEarned: state!.totalGoldEarned,
+    armyMoveAccumulator: state!.armyMoveAccumulator,
+  );
+
   Future<void> moveToNode(String nodeId) async {
     if (state == null) return;
 
@@ -94,18 +106,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     // Scout adjacent nodes
     ScoutingService.scoutAdjacentNodes(state!.currentMap, state!.party);
 
-    // Force state update
-    state = GameState(
-      party: state!.party,
-      gold: state!.gold,
-      currentMapNumber: state!.currentMapNumber,
-      currentMap: state!.currentMap,
-      difficulty: state!.difficulty,
-      totalEnemiesDefeated: state!.totalEnemiesDefeated,
-      totalGoldEarned: state!.totalGoldEarned,
-      armyMoveAccumulator: state!.armyMoveAccumulator,
-    );
-
+    state = _refreshState();
     await _autoSave();
   }
 
@@ -205,33 +206,14 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     state!.gold += goldGained;
     state!.totalGoldEarned += goldGained;
 
-    // Refresh state
-    state = GameState(
-      party: state!.party,
-      gold: state!.gold,
-      currentMapNumber: state!.currentMapNumber,
-      currentMap: state!.currentMap,
-      difficulty: state!.difficulty,
-      totalEnemiesDefeated: state!.totalEnemiesDefeated,
-      totalGoldEarned: state!.totalGoldEarned,
-      armyMoveAccumulator: state!.armyMoveAccumulator,
-    );
+    state = _refreshState();
     await _autoSave();
   }
 
   Future<void> addGold(int amount) async {
     if (state == null) return;
     state!.gold += amount;
-    state = GameState(
-      party: state!.party,
-      gold: state!.gold,
-      currentMapNumber: state!.currentMapNumber,
-      currentMap: state!.currentMap,
-      difficulty: state!.difficulty,
-      totalEnemiesDefeated: state!.totalEnemiesDefeated,
-      totalGoldEarned: state!.totalGoldEarned,
-      armyMoveAccumulator: state!.armyMoveAccumulator,
-    );
+    state = _refreshState();
     await _autoSave();
   }
 
@@ -241,16 +223,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     for (final char in state!.party) {
       char.currentHp = char.totalMaxHp;
     }
-    state = GameState(
-      party: state!.party,
-      gold: state!.gold,
-      currentMapNumber: state!.currentMapNumber,
-      currentMap: state!.currentMap,
-      difficulty: state!.difficulty,
-      totalEnemiesDefeated: state!.totalEnemiesDefeated,
-      totalGoldEarned: state!.totalGoldEarned,
-      armyMoveAccumulator: state!.armyMoveAccumulator,
-    );
+    state = _refreshState();
     await _autoSave();
   }
 
@@ -294,17 +267,9 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     // Push the army back 2 columns behind the player
     final playerCol = state!.currentMap.currentNode.column.toDouble();
     state!.currentMap.armyColumn = (playerCol - 2).clamp(-2.0, 7.0);
+    state!.armyMoveAccumulator = 0.0;
 
-    state = GameState(
-      party: state!.party,
-      gold: state!.gold,
-      currentMapNumber: state!.currentMapNumber,
-      currentMap: state!.currentMap,
-      difficulty: state!.difficulty,
-      totalEnemiesDefeated: state!.totalEnemiesDefeated,
-      totalGoldEarned: state!.totalGoldEarned,
-      armyMoveAccumulator: 0.0,
-    );
+    state = _refreshState();
     await _autoSave();
   }
 
@@ -316,6 +281,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     state = GameState(
       party: state!.party,
       gold: state!.gold,
+      healthPotions: state!.healthPotions,
       currentMapNumber: nextMap,
       currentMap: MapService.generateMap(nextMap),
       difficulty: state!.difficulty,
@@ -330,16 +296,72 @@ class GameStateNotifier extends StateNotifier<GameState?> {
   Future<void> spendGold(int amount) async {
     if (state == null) return;
     state!.gold -= amount;
-    state = GameState(
-      party: state!.party,
-      gold: state!.gold,
-      currentMapNumber: state!.currentMapNumber,
-      currentMap: state!.currentMap,
-      difficulty: state!.difficulty,
-      totalEnemiesDefeated: state!.totalEnemiesDefeated,
-      totalGoldEarned: state!.totalGoldEarned,
-      armyMoveAccumulator: state!.armyMoveAccumulator,
+    state = _refreshState();
+    await _autoSave();
+  }
+
+  Future<void> buyPotion(int cost) async {
+    if (state == null || state!.gold < cost) return;
+    state!.gold -= cost;
+    state!.healthPotions++;
+    state = _refreshState();
+    await _autoSave();
+  }
+
+  Future<void> usePotion() async {
+    if (state == null || state!.healthPotions <= 0) return;
+    state!.healthPotions--;
+    state = _refreshState();
+    await _autoSave();
+  }
+
+  Future<void> recruitCharacter(CharacterClass cls, int cost) async {
+    if (state == null) return;
+    if (state!.gold < cost) return;
+    if (state!.party.length >= 4) return;
+
+    final classDef = classDefinitions[cls]!;
+    final name = NameGenerator.generate(
+        cls.name[0].toUpperCase() + cls.name.substring(1));
+
+    // Gather abilities for level 1
+    final startingAbilities = classDef.abilities
+        .where((a) => a.unlockedAtLevel <= 1)
+        .map((a) => Ability(
+              name: a.name,
+              description: a.description,
+              damage: a.damage,
+              refreshChance: a.refreshChance,
+              targetType: a.targetType,
+              unlockedAtLevel: a.unlockedAtLevel,
+              isBasicAttack: a.isBasicAttack,
+            ))
+        .toList();
+
+    final recruit = Character(
+      id: _uuid.v4(),
+      name: name,
+      characterClass: cls,
+      currentHp: classDef.baseStats.hp,
+      maxHp: classDef.baseStats.hp,
+      attack: classDef.baseStats.attack,
+      defense: classDef.baseStats.defense,
+      speed: classDef.baseStats.speed,
+      magic: classDef.baseStats.magic,
+      abilities: startingAbilities,
     );
+
+    // Level up to party average level
+    final avgLevel = state!.party.fold<int>(0, (sum, c) => sum + c.level) ~/
+        state!.party.length;
+    for (int i = 1; i < avgLevel; i++) {
+      ProgressionService.levelUp(recruit);
+    }
+    recruit.currentHp = recruit.totalMaxHp; // Full health after leveling
+
+    state!.gold -= cost;
+    state!.party.add(recruit);
+    state = _refreshState();
     await _autoSave();
   }
 

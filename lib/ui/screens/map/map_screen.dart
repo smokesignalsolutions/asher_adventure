@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../models/enums.dart';
 import '../../../models/map_node.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../services/progression_service.dart';
 import '../../../services/scouting_service.dart';
 
 class MapScreen extends ConsumerWidget {
@@ -66,6 +67,12 @@ class MapScreen extends ConsumerWidget {
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
+                          Text(
+                            'Lv ${c.level}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: Colors.amber[300],
+                            ),
+                          ),
                           const SizedBox(height: 2),
                           if (c.isAlive) ...[
                             LinearProgressIndicator(
@@ -86,6 +93,21 @@ class MapScreen extends ConsumerWidget {
                               style: theme.textTheme.labelSmall
                                   ?.copyWith(color: Colors.red),
                             ),
+                          const SizedBox(height: 2),
+                          // XP bar
+                          LinearProgressIndicator(
+                            value: c.xp / ProgressionService.xpForLevel(c.level),
+                            backgroundColor: Colors.grey[800],
+                            color: Colors.blue[300],
+                            minHeight: 3,
+                          ),
+                          Text(
+                            '${c.xp}/${ProgressionService.xpForLevel(c.level)} XP',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              fontSize: 9,
+                              color: Colors.blue[200],
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -175,6 +197,8 @@ class MapScreen extends ConsumerWidget {
         context.go('/event');
       case NodeType.start:
         break;
+      case NodeType.recruit:
+        context.go('/recruit');
     }
   }
 }

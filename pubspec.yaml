@@ -56,6 +56,7 @@ flutter:
   assets:
     - assets/sprites/
     - assets/sprites/enemies/
+    - assets/sprites/abilities/
     - assets/sprites/backgrounds/
 
   # An image asset can refer to one or more resolution-specific "variants", see

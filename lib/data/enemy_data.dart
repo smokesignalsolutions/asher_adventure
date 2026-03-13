@@ -46,7 +46,7 @@ final Map<int, List<EnemyTemplate>> enemiesByMap = {
       abilities: [Ability(name: 'Venomous Bite', description: 'A poisonous bite.', damage: 10, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
   ],
   3: [
-    EnemyTemplate(name: 'Dark Mage', type: 'mage', hp: 50, attack: 5, defense: 5, speed: 8, magic: 14, xpReward: 40, goldReward: 18,
+    EnemyTemplate(name: 'Dark Mage', type: 'dark_mage', hp: 50, attack: 5, defense: 5, speed: 8, magic: 14, xpReward: 40, goldReward: 18,
       abilities: [Ability(name: 'Shadow Bolt', description: 'Dark magic strikes.', damage: 14, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
     EnemyTemplate(name: 'Ogre', type: 'ogre', hp: 80, attack: 14, defense: 8, speed: 3, magic: 0, xpReward: 45, goldReward: 20,
       abilities: [Ability(name: 'Club Slam', description: 'A massive club attack.', damage: 14, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
@@ -64,7 +64,7 @@ final Map<int, List<EnemyTemplate>> enemiesByMap = {
   5: [
     EnemyTemplate(name: 'Wyvern', type: 'wyvern', hp: 110, attack: 20, defense: 12, speed: 10, magic: 8, xpReward: 75, goldReward: 35,
       abilities: [Ability(name: 'Tail Lash', description: 'A whipping tail strike.', damage: 20, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Lich Acolyte', type: 'lich', hp: 70, attack: 8, defense: 6, speed: 7, magic: 22, xpReward: 80, goldReward: 40,
+    EnemyTemplate(name: 'Lich Acolyte', type: 'lich_acolyte', hp: 70, attack: 8, defense: 6, speed: 7, magic: 22, xpReward: 80, goldReward: 40,
       abilities: [Ability(name: 'Necrotic Blast', description: 'Death magic strikes.', damage: 22, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
     EnemyTemplate(name: 'Golem', type: 'golem', hp: 140, attack: 16, defense: 18, speed: 2, magic: 0, xpReward: 70, goldReward: 30,
       abilities: [Ability(name: 'Stone Fist', description: 'A crushing stone punch.', damage: 16, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
@@ -74,23 +74,23 @@ final Map<int, List<EnemyTemplate>> enemiesByMap = {
       abilities: [Ability(name: 'Blood Drain', description: 'Drink your blood.', damage: 18, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
     EnemyTemplate(name: 'Chimera', type: 'chimera', hp: 130, attack: 22, defense: 14, speed: 8, magic: 10, xpReward: 100, goldReward: 45,
       abilities: [Ability(name: 'Triple Strike', description: 'Three heads attack.', damage: 22, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Death Knight', type: 'deathknight', hp: 120, attack: 20, defense: 16, speed: 6, magic: 12, xpReward: 105, goldReward: 55,
+    EnemyTemplate(name: 'Death Knight', type: 'death_knight', hp: 120, attack: 20, defense: 16, speed: 6, magic: 12, xpReward: 105, goldReward: 55,
       abilities: [Ability(name: 'Unholy Slash', description: 'A cursed blade strike.', damage: 20, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
   ],
   7: [
-    EnemyTemplate(name: 'Elder Dragon', type: 'dragon', hp: 160, attack: 26, defense: 18, speed: 10, magic: 20, xpReward: 130, goldReward: 70,
+    EnemyTemplate(name: 'Elder Dragon', type: 'elder_dragon', hp: 160, attack: 26, defense: 18, speed: 10, magic: 20, xpReward: 130, goldReward: 70,
       abilities: [Ability(name: 'Fire Breath', description: 'Breathe searing fire.', damage: 26, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Archdemon', type: 'demon', hp: 140, attack: 24, defense: 14, speed: 12, magic: 22, xpReward: 135, goldReward: 65,
+    EnemyTemplate(name: 'Archdemon', type: 'archdemon', hp: 140, attack: 24, defense: 14, speed: 12, magic: 22, xpReward: 135, goldReward: 65,
       abilities: [Ability(name: 'Hellfire', description: 'Demonic fire engulfs you.', damage: 24, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
     EnemyTemplate(name: 'Titan', type: 'titan', hp: 200, attack: 22, defense: 20, speed: 4, magic: 10, xpReward: 140, goldReward: 60,
       abilities: [Ability(name: 'Colossal Stomp', description: 'Shake the earth.', damage: 22, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
   ],
   8: [
-    EnemyTemplate(name: 'Shadow Lord', type: 'shadow', hp: 180, attack: 28, defense: 16, speed: 14, magic: 26, xpReward: 170, goldReward: 80,
+    EnemyTemplate(name: 'Shadow Lord', type: 'shadow_lord', hp: 180, attack: 28, defense: 16, speed: 14, magic: 26, xpReward: 170, goldReward: 80,
       abilities: [Ability(name: 'Void Strike', description: 'Strike from the void.', damage: 28, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Ancient Wyrm', type: 'wyrm', hp: 220, attack: 30, defense: 22, speed: 8, magic: 18, xpReward: 180, goldReward: 90,
+    EnemyTemplate(name: 'Ancient Wyrm', type: 'ancient_wyrm', hp: 220, attack: 30, defense: 22, speed: 8, magic: 18, xpReward: 180, goldReward: 90,
       abilities: [Ability(name: 'Cataclysm', description: 'Devastation incarnate.', damage: 30, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Void Walker', type: 'voidwalker', hp: 150, attack: 24, defense: 12, speed: 16, magic: 30, xpReward: 175, goldReward: 85,
+    EnemyTemplate(name: 'Void Walker', type: 'void_walker', hp: 150, attack: 24, defense: 12, speed: 16, magic: 30, xpReward: 175, goldReward: 85,
       abilities: [Ability(name: 'Reality Tear', description: 'Tear the fabric of reality.', damage: 30, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
   ],
 };
@@ -157,7 +157,7 @@ List<EnemyTemplate> armySoldiers(int mapNumber) {
     ),
     // Army Clerics - heal allies
     EnemyTemplate(
-      name: 'Army Cleric', type: 'mage',
+      name: 'Army Cleric', type: 'dark_mage',
       hp: 30 + scale * 8, attack: 4 + scale * 2, defense: 4 + scale * 2,
       speed: 4 + scale, magic: 6 + scale * 3,
       xpReward: 18 + scale * 5, goldReward: 8 + scale * 3,
@@ -168,7 +168,7 @@ List<EnemyTemplate> armySoldiers(int mapNumber) {
     ),
     // Army Wizards - high damage, low hp
     EnemyTemplate(
-      name: 'Army Wizard', type: 'mage',
+      name: 'Army Wizard', type: 'dark_mage',
       hp: 25 + scale * 6, attack: 3 + scale, defense: 3 + scale,
       speed: 5 + scale, magic: 8 + scale * 4,
       xpReward: 20 + scale * 6, goldReward: 10 + scale * 4,

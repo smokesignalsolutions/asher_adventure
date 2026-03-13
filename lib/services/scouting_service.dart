@@ -46,6 +46,8 @@ class ScoutingService {
         return '❗';
       case NodeType.start:
         return '🏁';
+      case NodeType.recruit:
+        return '🍺';
     }
   }
 
@@ -58,6 +60,7 @@ class ScoutingService {
       case NodeType.boss: return 'Boss';
       case NodeType.event: return 'Event';
       case NodeType.start: return 'Start';
+      case NodeType.recruit: return 'Tavern';
     }
   }
 }

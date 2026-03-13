@@ -4,7 +4,7 @@ class MapNode {
   final String id;
   final int column;
   final int row;
-  final NodeType type;
+  NodeType type;
   final double x; // 0.0 to 1.0 horizontal position
   final double y; // 0.0 to 1.0 vertical position
   final List<String> connections; // ids of connected nodes

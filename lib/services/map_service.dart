@@ -57,6 +57,22 @@ class MapService {
       }
     }
 
+    // Guarantee at least 1 recruit node in columns 1-2
+    final hasRecruit = nodes.any((n) => n.column >= 1 && n.column <= 2 && n.type == NodeType.recruit);
+    if (!hasRecruit) {
+      final candidates = nodes.where((n) =>
+          n.column >= 1 && n.column <= 2 &&
+          n.type != NodeType.combat && n.type != NodeType.start).toList();
+      if (candidates.isNotEmpty) {
+        candidates[_random.nextInt(candidates.length)].type = NodeType.recruit;
+      } else {
+        final combatNodes = nodes.where((n) => n.column >= 1 && n.column <= 2).toList();
+        if (combatNodes.isNotEmpty) {
+          combatNodes[_random.nextInt(combatNodes.length)].type = NodeType.recruit;
+        }
+      }
+    }
+
     // Column 7: single boss node, centered
     nodes.add(MapNode(
       id: 'map${mapNumber}_7_0',
@@ -164,11 +180,12 @@ class MapService {
 
   static NodeType _randomNodeType(int mapNumber) {
     final roll = _random.nextInt(100);
-    if (roll < 45) return NodeType.combat;
-    if (roll < 60) return NodeType.treasure;
-    if (roll < 75) return NodeType.event;
-    if (roll < 87) return NodeType.rest;
-    return NodeType.shop;
+    if (roll < 40) return NodeType.combat;
+    if (roll < 52) return NodeType.treasure;
+    if (roll < 64) return NodeType.event;
+    if (roll < 74) return NodeType.rest;
+    if (roll < 85) return NodeType.shop;
+    return NodeType.recruit;
   }
 
   static double advanceArmy(
