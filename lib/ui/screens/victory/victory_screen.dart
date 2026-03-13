@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../widgets/audio_controls.dart';
 
 class VictoryScreen extends ConsumerWidget {
   const VictoryScreen({super.key});
@@ -11,6 +12,8 @@ class VictoryScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
+      floatingActionButton: const AudioMuteButton(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endTop,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),

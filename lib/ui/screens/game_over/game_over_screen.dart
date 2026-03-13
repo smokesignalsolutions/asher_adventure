@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../widgets/audio_controls.dart';
 
 class GameOverScreen extends StatelessWidget {
   const GameOverScreen({super.key});
@@ -9,6 +10,8 @@ class GameOverScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
+      floatingActionButton: const AudioMuteButton(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endTop,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),

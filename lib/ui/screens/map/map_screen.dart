@@ -7,6 +7,7 @@ import '../../../models/map_node.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../services/progression_service.dart';
 import '../../../services/scouting_service.dart';
+import '../../widgets/audio_controls.dart';
 
 class MapScreen extends ConsumerWidget {
   const MapScreen({super.key});
@@ -33,6 +34,7 @@ class MapScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text('Map ${gameState.currentMapNumber} of 8'),
         actions: [
+          const AudioMuteButton(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Center(

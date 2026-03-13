@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../widgets/audio_controls.dart';
 
 class RestScreen extends ConsumerWidget {
   const RestScreen({super.key});
@@ -16,7 +17,10 @@ class RestScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Rest Stop')),
+      appBar: AppBar(
+        title: const Text('Rest Stop'),
+        actions: const [AudioMuteButton()],
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),

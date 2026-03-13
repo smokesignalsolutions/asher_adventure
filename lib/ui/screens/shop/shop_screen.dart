@@ -5,7 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../data/equipment_data.dart';
 import '../../../models/character.dart';
 import '../../../models/equipment.dart';
+import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../services/audio_service.dart';
+import '../../widgets/audio_controls.dart';
 
 class ShopScreen extends ConsumerStatefulWidget {
   const ShopScreen({super.key});
@@ -51,6 +54,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
       appBar: AppBar(
         title: const Text('Shop'),
         actions: [
+          const AudioMuteButton(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Center(
@@ -198,6 +202,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
       sellBack = (oldItem.value / 2).floor();
     }
     char.equipment[item.slot] = item;
+    ref.read(audioProvider.notifier).playSfx(SfxType.goldPickup);
     ref.read(gameStateProvider.notifier).spendGold(item.value);
     if (sellBack > 0) {
       ref.read(gameStateProvider.notifier).addGold(sellBack);
