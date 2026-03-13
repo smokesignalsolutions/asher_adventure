@@ -8,7 +8,9 @@ import '../../../models/character.dart';
 import '../../../models/combat_state.dart';
 import '../../../models/enemy.dart';
 import '../../../models/enums.dart';
+import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../services/audio_service.dart';
 import '../../../services/combat_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -85,8 +87,10 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     _isArmyFight = notifier.isArmyCatching;
     if (_isArmyFight) {
       enemies = notifier.generateArmyEnemies();
+      ref.read(audioProvider.notifier).playMusic(MusicTrack.bossBattle);
     } else if (currentNode.type == NodeType.boss) {
       enemies = notifier.generateBoss();
+      ref.read(audioProvider.notifier).playMusic(MusicTrack.bossBattle);
     } else {
       enemies = notifier.generateEnemies();
     }
@@ -102,6 +106,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     if (_combat == null || _combat!.isComplete) return;
 
     if (_combat!.allEnemiesDead) {
+      ref.read(audioProvider.notifier).playMusic(MusicTrack.victory);
       setState(() {
         _combat!.isComplete = true;
         _combat!.isVictory = true;
@@ -110,6 +115,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       return;
     }
     if (_combat!.allAlliesDead) {
+      ref.read(audioProvider.notifier).playMusic(MusicTrack.gameOver);
       setState(() {
         _combat!.isComplete = true;
         _combat!.isVictory = false;
@@ -269,6 +275,10 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     for (final a in _combat!.allies) {
       final diff = a.currentHp - allyHpBefore[a.id]!;
       if (diff > 0) lines.add(_AttackLineData(char.id, a.id, diff, true, true));
+    }
+
+    if (lines.isNotEmpty) {
+      ref.read(audioProvider.notifier).playSfx(SfxType.attackHit);
     }
 
     setState(() {

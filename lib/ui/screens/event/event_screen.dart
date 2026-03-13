@@ -2,7 +2,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../services/audio_service.dart';
+import '../../widgets/audio_controls.dart';
 
 class _EventChoice {
   final String text;
@@ -104,6 +107,7 @@ class _EventScreenState extends ConsumerState<EventScreen> {
   }
 
   void _choose(_EventChoice choice) {
+    ref.read(audioProvider.notifier).playSfx(SfxType.menuSelect);
     final notifier = ref.read(gameStateProvider.notifier);
     final gameState = ref.read(gameStateProvider);
     if (gameState == null) return;
@@ -127,7 +131,10 @@ class _EventScreenState extends ConsumerState<EventScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Event')),
+      appBar: AppBar(
+        title: const Text('Event'),
+        actions: const [AudioMuteButton()],
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),

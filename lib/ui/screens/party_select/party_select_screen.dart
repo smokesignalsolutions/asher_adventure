@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/class_data.dart';
 import '../../../models/enums.dart';
+import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../services/audio_service.dart';
+import '../../widgets/audio_controls.dart';
 
 class PartySelectScreen extends ConsumerStatefulWidget {
   const PartySelectScreen({super.key});
@@ -24,6 +27,7 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
   }).toList();
 
   void _toggleClass(CharacterClass cls) {
+    ref.read(audioProvider.notifier).playSfx(SfxType.menuSelect);
     setState(() {
       if (_selectedClasses.contains(cls)) {
         _selectedClasses.remove(cls);
@@ -49,7 +53,10 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Choose Your Party')),
+      appBar: AppBar(
+        title: const Text('Choose Your Party'),
+        actions: const [AudioMuteButton()],
+      ),
       body: Column(
         children: [
           Padding(

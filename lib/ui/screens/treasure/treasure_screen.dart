@@ -6,7 +6,10 @@ import '../../../data/equipment_data.dart';
 import '../../../models/character.dart';
 import '../../../models/enums.dart';
 import '../../../models/equipment.dart';
+import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../services/audio_service.dart';
+import '../../widgets/audio_controls.dart';
 
 class TreasureScreen extends ConsumerStatefulWidget {
   const TreasureScreen({super.key});
@@ -35,6 +38,9 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
 
     _loot = pool[random.nextInt(pool.length)];
     _goldFound = 10 + random.nextInt(20) * gameState.currentMapNumber;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(audioProvider.notifier).playSfx(SfxType.goldPickup);
+    });
   }
 
   @override
@@ -47,9 +53,12 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Treasure!')),
+      appBar: AppBar(
+        title: const Text('Treasure!'),
+        actions: const [AudioMuteButton()],
+      ),
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

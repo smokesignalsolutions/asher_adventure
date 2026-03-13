@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../services/audio_service.dart';
+import '../../widgets/audio_controls.dart';
 
 class TitleScreen extends ConsumerStatefulWidget {
   const TitleScreen({super.key});
@@ -33,6 +36,8 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      floatingActionButton: const AudioMuteButton(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endTop,
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -68,7 +73,10 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
                     SizedBox(
                       width: 220,
                       child: FilledButton.icon(
-                        onPressed: () => context.go('/party-select'),
+                        onPressed: () {
+                          ref.read(audioProvider.notifier).playSfx(SfxType.menuSelect);
+                          context.go('/party-select');
+                        },
                         icon: const Icon(Icons.add),
                         label: const Text('New Game'),
                       ),
@@ -78,7 +86,10 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
                       SizedBox(
                         width: 220,
                         child: FilledButton.tonalIcon(
-                          onPressed: () => context.go('/map'),
+                          onPressed: () {
+                            ref.read(audioProvider.notifier).playSfx(SfxType.menuSelect);
+                            context.go('/map');
+                          },
                           icon: const Icon(Icons.play_arrow),
                           label: const Text('Continue'),
                         ),

@@ -36,6 +36,7 @@ dependencies:
   shared_preferences: ^2.2.2
   uuid: ^4.3.3
   collection: ^1.18.0
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -57,6 +58,8 @@ flutter:
     - assets/sprites/
     - assets/sprites/enemies/
     - assets/sprites/backgrounds/
+    - assets/audio/music/
+    - assets/audio/sfx/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
