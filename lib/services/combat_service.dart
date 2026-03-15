@@ -82,29 +82,35 @@ class CombatService {
     }
   }
 
-  static int calculateDamage(int attackStat, int abilityDamage, int targetDefense, {bool targetVulnerable = false, bool chaotic = false, double damageMultiplier = 1.0}) {
-    // Base damage = attack + ability damage - defense/2
-    // Minimum 1 damage
+  /// Returns true if this roll is a critical hit. 5% base + speed/2 %.
+  static bool rollCrit(int speed) {
+    final critChance = 5 + speed ~/ 2;
+    return _random.nextInt(100) < critChance;
+  }
+
+  static (int damage, bool isCrit) calculateDamage(int attackStat, int abilityDamage, int targetDefense, {bool targetVulnerable = false, bool chaotic = false, double damageMultiplier = 1.0, int attackerSpeed = 0}) {
     final raw = attackStat + abilityDamage - (targetDefense ~/ 2);
-    // Chaotic: ±25% variance, Normal: ±20% variance
     final variance = chaotic
         ? 0.75 + _random.nextDouble() * 0.50
         : 0.8 + _random.nextDouble() * 0.4;
     var result = max(1, (raw * variance).round());
-    // Vulnerable enemies take 5-15% extra damage
     if (targetVulnerable) {
       final bonus = 1.05 + _random.nextDouble() * 0.10;
       result = (result * bonus).round();
     }
     result = (result * damageMultiplier).round();
-    return max(1, result);
+    final isCrit = rollCrit(attackerSpeed);
+    if (isCrit) result = (result * 1.5).round();
+    return (max(1, result), isCrit);
   }
 
-  static int calculateHealing(int magicStat, int abilityHeal, {double healingMultiplier = 1.0}) {
-    // Heal amount = magic/2 + ability heal amount (stored as negative damage)
+  static (int healing, bool isCrit) calculateHealing(int magicStat, int abilityHeal, {double healingMultiplier = 1.0, int casterSpeed = 0}) {
     final raw = (magicStat ~/ 2) + abilityHeal.abs();
     final variance = 0.9 + _random.nextDouble() * 0.2;
-    return max(1, (raw * variance * healingMultiplier).round());
+    var result = max(1, (raw * variance * healingMultiplier).round());
+    final isCrit = rollCrit(casterSpeed);
+    if (isCrit) result = (result * 1.5).round();
+    return (result, isCrit);
   }
 
   static bool tryRefreshAbility(Ability ability) {
@@ -127,12 +133,14 @@ class CombatService {
   static String executeChaoticBounce(Character attacker, Ability ability, Enemy target) {
     final useMagic = magicDamageClasses.contains(attacker.characterClass);
     final offensiveStat = useMagic ? attacker.totalMagic : attacker.totalAttack;
-    final damage = calculateDamage(
+    final (damage, isCrit) = calculateDamage(
       offensiveStat, ability.damage, target.effectiveDefense,
       targetVulnerable: target.isVulnerable, chaotic: true,
+      attackerSpeed: attacker.totalSpeed,
     );
     target.currentHp = max(0, target.currentHp - damage);
     var result = 'Chaos Bolt bounces to ${target.name} for $damage damage!';
+    if (isCrit) result += ' CRIT!';
     if (!target.isAlive) result += ' ${target.name} is defeated!';
     return result;
   }
@@ -183,14 +191,15 @@ class CombatService {
 
       final useMagic = magicDamageClasses.contains(attacker.characterClass);
       final offensiveStat = useMagic ? attacker.totalMagic : attacker.totalAttack;
-      final damage = calculateDamage(
+      final (damage, isCrit) = calculateDamage(
         offensiveStat, ability.damage, enemyTarget.effectiveDefense,
         targetVulnerable: enemyTarget.isVulnerable,
         chaotic: ability.chaotic,
         damageMultiplier: chainCastMult,
+        attackerSpeed: attacker.totalSpeed,
       );
       enemyTarget.currentHp = max(0, enemyTarget.currentHp - damage);
-      logs.add('${attacker.name} uses ${ability.name} on ${enemyTarget.name} for $damage damage!');
+      logs.add('${attacker.name} uses ${ability.name} on ${enemyTarget.name} for $damage damage!${isCrit ? ' CRIT!' : ''}');
 
       // Vampiric: heal for 25% of damage dealt
       if (attacker.equipment[EquipmentSlot.weapon]?.specialEffect == SpecialEffect.vampiric && damage > 0) {
@@ -237,9 +246,9 @@ class CombatService {
       // Heal
       if (ability.damage < 0) {
         final healStat = ability.healScalesWithDefense ? attacker.totalDefense : attacker.totalMagic;
-        final healAmount = calculateHealing(healStat, ability.damage, healingMultiplier: healingMultiplier);
+        final (healAmount, healCrit) = calculateHealing(healStat, ability.damage, healingMultiplier: healingMultiplier, casterSpeed: attacker.totalSpeed);
         charTarget.currentHp = min(charTarget.totalMaxHp, charTarget.currentHp + healAmount);
-        logs.add('${attacker.name} uses ${ability.name} on ${charTarget.name} for $healAmount healing!');
+        logs.add('${attacker.name} uses ${ability.name} on ${charTarget.name} for $healAmount healing!${healCrit ? ' CRIT!' : ''}');
       } else if (ability.healPercentMaxHp > 0) {
         final healAmount = (charTarget.totalMaxHp * ability.healPercentMaxHp / 100 * healingMultiplier).round();
         charTarget.currentHp = min(charTarget.totalMaxHp, charTarget.currentHp + healAmount);
@@ -294,7 +303,7 @@ class CombatService {
 
     if (ability.damage < 0) {
       // Self heal
-      final healAmount = calculateHealing(enemy.magic, ability.damage);
+      final (healAmount, _) = calculateHealing(enemy.magic, ability.damage, casterSpeed: enemy.speed);
       enemy.currentHp = min(enemy.maxHp, enemy.currentHp + healAmount);
       if (!ability.isBasicAttack) ability.isAvailable = false;
       logs.add('${enemy.name} uses ${ability.name} and heals for $healAmount!');
@@ -304,8 +313,8 @@ class CombatService {
     if (ability.targetType == AbilityTarget.allEnemies) {
       // Hit all allies
       for (final ally in aliveAllies) {
-        var damage = calculateDamage(enemy.effectiveAttack, ability.damage, ally.totalDefense, damageMultiplier: enemyDamageMultiplier);
-        var log = '${ally.name} takes $damage damage';
+        var (damage, isCrit) = calculateDamage(enemy.effectiveAttack, ability.damage, ally.totalDefense, damageMultiplier: enemyDamageMultiplier, attackerSpeed: enemy.speed);
+        var log = '${ally.name} takes $damage damage${isCrit ? ' (CRIT!)' : ''}';
         // Shield absorbs damage first
         if (ally.shieldHp > 0) {
           final shieldAbsorb = min(damage, ally.shieldHp);
@@ -334,9 +343,9 @@ class CombatService {
 
     // Single target
     final target = aliveAllies[_random.nextInt(aliveAllies.length)];
-    var damage = calculateDamage(enemy.effectiveAttack, ability.damage, target.totalDefense, damageMultiplier: enemyDamageMultiplier);
+    var (damage, isCrit) = calculateDamage(enemy.effectiveAttack, ability.damage, target.totalDefense, damageMultiplier: enemyDamageMultiplier, attackerSpeed: enemy.speed);
     if (!ability.isBasicAttack) ability.isAvailable = false;
-    var log = '${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!';
+    var log = '${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!${isCrit ? ' CRIT!' : ''}';
     // Shield absorbs damage first
     if (target.shieldHp > 0) {
       final shieldAbsorb = min(damage, target.shieldHp);
