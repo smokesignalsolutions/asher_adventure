@@ -15,9 +15,12 @@ import '../../../models/enums.dart';
 import '../../../data/map_backgrounds.dart';
 import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../providers/help_mode_provider.dart';
 import '../../../services/audio_service.dart';
 import '../../../data/mutator_data.dart';
 import '../../../services/combat_service.dart';
+import '../../widgets/help_button.dart';
+import '../../widgets/help_dialogs.dart';
 
 // ---------------------------------------------------------------------------
 // Attack line data
@@ -574,10 +577,20 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       color: theme.colorScheme.surfaceContainerHigh,
       child: Column(
         children: [
-          Text(
-            'Round ${_combat!.roundNumber}',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.bold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(width: 40), // balance the HelpButton on the right
+              Expanded(
+                child: Text(
+                  'Round ${_combat!.roundNumber}',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 40, child: HelpButton()),
+            ],
           ),
           const SizedBox(height: 4),
           SingleChildScrollView(
@@ -680,8 +693,13 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                               (_potionMode && ally.isAlive);
                           return Flexible(
                             child: GestureDetector(
-                              onTap: isHealTarget
+                              onTap: isHealTarget || ref.read(helpModeProvider)
                                   ? () {
+                                      if (ref.read(helpModeProvider)) {
+                                        ref.read(helpModeProvider.notifier).state = false;
+                                        showCharacterHelp(context, ally);
+                                        return;
+                                      }
                                       if (_potionMode) {
                                         _usePotion(ally);
                                       } else {
@@ -756,8 +774,15 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                 enemy.isAlive;
             return Flexible(
               child: GestureDetector(
-                onTap: isTarget
-                    ? () => _useAbility(_selectedAbility!, enemy)
+                onTap: isTarget || ref.read(helpModeProvider)
+                    ? () {
+                        if (ref.read(helpModeProvider)) {
+                          ref.read(helpModeProvider.notifier).state = false;
+                          showEnemyHelp(context, enemy);
+                          return;
+                        }
+                        _useAbility(_selectedAbility!, enemy);
+                      }
                     : null,
                 child: _buildEnemyWidget(theme, enemy, isTarget),
               ),
@@ -822,21 +847,40 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           if (ally.isAlive) ...[
             SizedBox(
               width: spriteSize,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: LinearProgressIndicator(
-                  value: ally.currentHp / ally.totalMaxHp,
-                  minHeight: 5,
-                  color: _hpColor(ally.currentHp / ally.totalMaxHp),
-                  backgroundColor: Colors.black45,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (ally.shieldHp > 0)
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                      child: LinearProgressIndicator(
+                        value: (ally.shieldHp / ally.totalMaxHp).clamp(0.0, 1.0),
+                        minHeight: 4,
+                        color: Colors.cyan.shade300,
+                        backgroundColor: Colors.cyan.shade900.withValues(alpha: 0.3),
+                      ),
+                    ),
+                  ClipRRect(
+                    borderRadius: ally.shieldHp > 0
+                        ? const BorderRadius.vertical(bottom: Radius.circular(3))
+                        : BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: ally.currentHp / ally.totalMaxHp,
+                      minHeight: 5,
+                      color: _hpColor(ally.currentHp / ally.totalMaxHp),
+                      backgroundColor: Colors.black45,
+                    ),
+                  ),
+                ],
               ),
             ),
             Text(
-              '${ally.currentHp}/${ally.totalMaxHp}',
+              ally.shieldHp > 0
+                  ? '${ally.currentHp}/${ally.totalMaxHp} +${ally.shieldHp}'
+                  : '${ally.currentHp}/${ally.totalMaxHp}',
               style: theme.textTheme.labelSmall?.copyWith(
                 fontSize: 9,
-                color: Colors.white,
+                color: ally.shieldHp > 0 ? Colors.cyan.shade200 : Colors.white,
                 shadows: const [
                   Shadow(color: Colors.black, blurRadius: 2)
                 ],
@@ -1061,6 +1105,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                     canUse: canUse,
                     onTap: canUse
                         ? () {
+                            if (ref.read(helpModeProvider)) {
+                              ref.read(helpModeProvider.notifier).state = false;
+                              showAbilityHelp(context, ability);
+                              return;
+                            }
                             setState(() {
                               _selectedAbility = ability;
                               _potionMode = false;
