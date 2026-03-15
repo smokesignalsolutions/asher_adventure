@@ -161,6 +161,20 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
                     const SizedBox(height: 16),
                     SizedBox(
                       width: 220,
+                      child: FilledButton.tonalIcon(
+                        onPressed: () {
+                          ref
+                              .read(audioProvider.notifier)
+                              .playSfx(SfxType.menuSelect);
+                          context.go('/legacy-hall');
+                        },
+                        icon: const Icon(Icons.stars),
+                        label: const Text('Legacy Hall'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: 220,
                       child: OutlinedButton.icon(
                         onPressed: () {
                           ref
