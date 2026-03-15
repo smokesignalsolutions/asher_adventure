@@ -10,6 +10,7 @@ class ClassDefinition {
   final double initiativeModifier;
   final List<Ability> abilities;
   final bool unlockedByDefault;
+  final bool usesMagicForDamage;
 
   const ClassDefinition({
     required this.name,
@@ -19,8 +20,22 @@ class ClassDefinition {
     required this.initiativeModifier,
     required this.abilities,
     required this.unlockedByDefault,
+    this.usesMagicForDamage = false,
   });
 }
+
+/// Set of classes whose offensive abilities scale off magic instead of attack.
+const magicDamageClasses = {
+  CharacterClass.cleric,
+  CharacterClass.wizard,
+  CharacterClass.warlock,
+  CharacterClass.summoner,
+  CharacterClass.spellsword,
+  CharacterClass.druid,
+  CharacterClass.sorcerer,
+  CharacterClass.necromancer,
+  CharacterClass.artificer,
+};
 
 final Map<CharacterClass, ClassDefinition> classDefinitions = {
   CharacterClass.fighter: ClassDefinition(
@@ -62,6 +77,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     growthRates: const CharacterStats(hp: 12, attack: 1, defense: 2, speed: 1, magic: 3),
     initiativeModifier: 0.0,
     unlockedByDefault: true,
+    usesMagicForDamage: true,
     abilities: [
       Ability(name: 'Smite', description: 'Strike with holy light.', damage: 8, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Heal', description: 'Restore an ally\'s health.', damage: -25, refreshChance: 60, targetType: AbilityTarget.singleAlly, unlockedAtLevel: 1),
@@ -78,6 +94,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     growthRates: const CharacterStats(hp: 8, attack: 0, defense: 1, speed: 1, magic: 4),
     initiativeModifier: -1.0,
     unlockedByDefault: true,
+    usesMagicForDamage: true,
     abilities: [
       Ability(name: 'Arcane Bolt', description: 'A bolt of pure magic.', damage: 12, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Fireball', description: 'Launch a ball of fire at all enemies.', damage: 14, refreshChance: 50, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 2),
@@ -126,6 +143,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     growthRates: const CharacterStats(hp: 9, attack: 1, defense: 1, speed: 1, magic: 4),
     initiativeModifier: 0.5,
     unlockedByDefault: true,
+    usesMagicForDamage: true,
     abilities: [
       Ability(name: 'Eldritch Blast', description: 'Dark energy lashes out.', damage: 12, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Hex', description: 'Curse an enemy, reducing their attack and defense.', damage: 8, refreshChance: 55, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 2, enemyAttackDebuffPercent: 20, enemyDefenseDebuffPercent: 20),
@@ -142,6 +160,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     growthRates: const CharacterStats(hp: 8, attack: 1, defense: 1, speed: 1, magic: 4),
     initiativeModifier: -0.5,
     unlockedByDefault: true,
+    usesMagicForDamage: true,
     abilities: [
       Ability(name: 'Spirit Bolt', description: 'Command a spirit to attack.', damage: 10, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Summon Wolf', description: 'A wolf spirit attacks an enemy.', damage: 18, refreshChance: 50, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 2),
@@ -158,6 +177,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     growthRates: const CharacterStats(hp: 11, attack: 2, defense: 2, speed: 1, magic: 2),
     initiativeModifier: 1.0,
     unlockedByDefault: true,
+    usesMagicForDamage: true,
     abilities: [
       Ability(name: 'Arcane Slash', description: 'A magic-infused sword strike.', damage: 11, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Flame Blade', description: 'Your sword erupts in flame.', damage: 18, refreshChance: 55, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 3),
@@ -174,6 +194,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     growthRates: const CharacterStats(hp: 11, attack: 1, defense: 2, speed: 1, magic: 3),
     initiativeModifier: 0.5,
     unlockedByDefault: true,
+    usesMagicForDamage: true,
     abilities: [
       Ability(name: 'Thorn Whip', description: 'Lash out with thorny vines.', damage: 9, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Rejuvenate', description: 'Nature restores an ally.', damage: -22, refreshChance: 55, targetType: AbilityTarget.singleAlly, unlockedAtLevel: 2),
@@ -222,6 +243,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     growthRates: const CharacterStats(hp: 7, attack: 0, defense: 1, speed: 1, magic: 5),
     initiativeModifier: 0.5,
     unlockedByDefault: true,
+    usesMagicForDamage: true,
     abilities: [
       Ability(name: 'Magic Missile', description: 'Unerring bolts of force.', damage: 13, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Wild Surge', description: 'Chaotic magic blasts a foe.', damage: 20, refreshChance: 55, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 2),
@@ -238,6 +260,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     growthRates: const CharacterStats(hp: 8, attack: 1, defense: 1, speed: 1, magic: 4),
     initiativeModifier: -0.5,
     unlockedByDefault: true,
+    usesMagicForDamage: true,
     abilities: [
       Ability(name: 'Death Bolt', description: 'A bolt of necrotic energy.', damage: 11, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Life Tap', description: 'Drain life from an enemy to heal.', damage: 16, refreshChance: 55, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 2, lifeDrain: true),
@@ -254,6 +277,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     growthRates: const CharacterStats(hp: 10, attack: 2, defense: 2, speed: 1, magic: 2),
     initiativeModifier: 0.5,
     unlockedByDefault: true,
+    usesMagicForDamage: true,
     abilities: [
       Ability(name: 'Wrench Toss', description: 'Hurl a wrench at the enemy.', damage: 10, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Deploy Turret', description: 'A turret blasts an enemy.', damage: 18, refreshChance: 50, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 2),

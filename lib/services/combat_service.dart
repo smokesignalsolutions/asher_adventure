@@ -1,4 +1,5 @@
 import 'dart:math';
+import '../data/class_data.dart';
 import '../models/ability.dart';
 import '../models/character.dart';
 import '../models/combat_state.dart';
@@ -122,8 +123,10 @@ class CombatService {
 
   /// Chaotic bounce: hit a random enemy with the same ability
   static String executeChaoticBounce(Character attacker, Ability ability, Enemy target) {
+    final useMagic = magicDamageClasses.contains(attacker.characterClass);
+    final offensiveStat = useMagic ? attacker.totalMagic : attacker.totalAttack;
     final damage = calculateDamage(
-      attacker.totalAttack, ability.damage, target.effectiveDefense,
+      offensiveStat, ability.damage, target.effectiveDefense,
       targetVulnerable: target.isVulnerable, chaotic: true,
     );
     target.currentHp = max(0, target.currentHp - damage);
@@ -175,8 +178,10 @@ class CombatService {
         }
       }
 
+      final useMagic = magicDamageClasses.contains(attacker.characterClass);
+      final offensiveStat = useMagic ? attacker.totalMagic : attacker.totalAttack;
       final damage = calculateDamage(
-        attacker.totalAttack, ability.damage, enemyTarget.effectiveDefense,
+        offensiveStat, ability.damage, enemyTarget.effectiveDefense,
         targetVulnerable: enemyTarget.isVulnerable,
         chaotic: ability.chaotic,
         damageMultiplier: chainCastMult,
