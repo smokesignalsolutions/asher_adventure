@@ -81,7 +81,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     abilities: [
       Ability(name: 'Smite', description: 'Strike with holy light.', damage: 8, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Heal', description: 'Restore an ally\'s health.', damage: -25, refreshChance: 60, targetType: AbilityTarget.singleAlly, unlockedAtLevel: 1),
-      Ability(name: 'Holy Shield', description: 'Raise a divine barrier, boosting all allies\' defense.', damage: 0, refreshChance: 50, targetType: AbilityTarget.allAllies, unlockedAtLevel: 4, defenseBuffPercent: 25),
+      Ability(name: 'Holy Shield', description: 'Raise a divine barrier, healing and boosting all allies\' defense.', damage: -10, refreshChance: 50, targetType: AbilityTarget.allAllies, unlockedAtLevel: 4, defenseBuffPercent: 25),
       Ability(name: 'Mass Heal', description: 'Heal the entire party.', damage: -15, refreshChance: 30, targetType: AbilityTarget.allAllies, unlockedAtLevel: 7),
       Ability(name: 'Divine Wrath', description: 'Call down holy fire on all enemies.', damage: 20, refreshChance: 25, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 11),
     ],
