@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../data/class_data.dart';
 import '../../../data/legacy_data.dart';
 import '../../../models/enums.dart';
@@ -25,6 +26,10 @@ class LegacyHallScreen extends ConsumerWidget {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => GoRouter.of(context).go('/'),
+          ),
           title: const Text('Legacy Hall'),
           bottom: const TabBar(
             tabs: [

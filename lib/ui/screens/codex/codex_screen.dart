@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../data/codex_data.dart';
 import '../../../models/player_profile.dart';
 import '../../../providers/player_profile_provider.dart';
@@ -19,6 +20,10 @@ class CodexScreen extends ConsumerWidget {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => GoRouter.of(context).go('/'),
+          ),
           title: const Text('Codex'),
           bottom: const TabBar(
             tabs: [
