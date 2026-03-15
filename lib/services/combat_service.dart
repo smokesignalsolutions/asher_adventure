@@ -79,7 +79,7 @@ class CombatService {
     }
   }
 
-  static int calculateDamage(int attackStat, int abilityDamage, int targetDefense, {bool targetVulnerable = false, bool chaotic = false}) {
+  static int calculateDamage(int attackStat, int abilityDamage, int targetDefense, {bool targetVulnerable = false, bool chaotic = false, double damageMultiplier = 1.0}) {
     // Base damage = attack + ability damage - defense/2
     // Minimum 1 damage
     final raw = attackStat + abilityDamage - (targetDefense ~/ 2);
@@ -93,14 +93,15 @@ class CombatService {
       final bonus = 1.05 + _random.nextDouble() * 0.10;
       result = (result * bonus).round();
     }
-    return result;
+    result = (result * damageMultiplier).round();
+    return max(1, result);
   }
 
-  static int calculateHealing(int magicStat, int abilityHeal) {
+  static int calculateHealing(int magicStat, int abilityHeal, {double healingMultiplier = 1.0}) {
     // Heal amount = magic/2 + ability heal amount (stored as negative damage)
     final raw = (magicStat ~/ 2) + abilityHeal.abs();
     final variance = 0.9 + _random.nextDouble() * 0.2;
-    return max(1, (raw * variance).round());
+    return max(1, (raw * variance * healingMultiplier).round());
   }
 
   static bool tryRefreshAbility(Ability ability) {
@@ -151,8 +152,9 @@ class CombatService {
   static String executeAllyTurn(
     Character attacker,
     Ability ability,
-    dynamic target, // Character or Enemy
-  ) {
+    dynamic target, { // Character or Enemy
+    double healingMultiplier = 1.0,
+  }) {
     if (!ability.isBasicAttack) {
       ability.isAvailable = false;
     }
@@ -208,11 +210,11 @@ class CombatService {
       // Heal
       if (ability.damage < 0) {
         final healStat = ability.healScalesWithDefense ? attacker.totalDefense : attacker.totalMagic;
-        final healAmount = calculateHealing(healStat, ability.damage);
+        final healAmount = calculateHealing(healStat, ability.damage, healingMultiplier: healingMultiplier);
         charTarget.currentHp = min(charTarget.totalMaxHp, charTarget.currentHp + healAmount);
         logs.add('${attacker.name} uses ${ability.name} on ${charTarget.name} for $healAmount healing!');
       } else if (ability.healPercentMaxHp > 0) {
-        final healAmount = (charTarget.totalMaxHp * ability.healPercentMaxHp / 100).round();
+        final healAmount = (charTarget.totalMaxHp * ability.healPercentMaxHp / 100 * healingMultiplier).round();
         charTarget.currentHp = min(charTarget.totalMaxHp, charTarget.currentHp + healAmount);
         logs.add('${attacker.name} uses ${ability.name}! ${charTarget.name} heals $healAmount HP!');
       } else {
@@ -239,7 +241,7 @@ class CombatService {
   }
 
   /// Enemy AI: pick a random alive ally to attack with basic attack
-  static String executeEnemyTurn(Enemy enemy, List<Character> allies) {
+  static String executeEnemyTurn(Enemy enemy, List<Character> allies, {double enemyDamageMultiplier = 1.0}) {
     // Check stun
     if (enemy.isStunned) {
       enemy.isStunned = false;
@@ -275,7 +277,7 @@ class CombatService {
     if (ability.targetType == AbilityTarget.allEnemies) {
       // Hit all allies
       for (final ally in aliveAllies) {
-        final damage = calculateDamage(enemy.effectiveAttack, ability.damage, ally.totalDefense);
+        final damage = calculateDamage(enemy.effectiveAttack, ability.damage, ally.totalDefense, damageMultiplier: enemyDamageMultiplier);
         ally.currentHp = max(0, ally.currentHp - damage);
         logs.add('${ally.name} takes $damage damage');
         if (!ally.isAlive) logs.add('${ally.name} falls!');
@@ -286,7 +288,7 @@ class CombatService {
 
     // Single target
     final target = aliveAllies[_random.nextInt(aliveAllies.length)];
-    final damage = calculateDamage(enemy.effectiveAttack, ability.damage, target.totalDefense);
+    final damage = calculateDamage(enemy.effectiveAttack, ability.damage, target.totalDefense, damageMultiplier: enemyDamageMultiplier);
     target.currentHp = max(0, target.currentHp - damage);
     if (!ability.isBasicAttack) ability.isAvailable = false;
     logs.add('${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!');

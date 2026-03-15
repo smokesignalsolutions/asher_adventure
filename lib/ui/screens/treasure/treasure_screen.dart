@@ -8,6 +8,7 @@ import '../../../models/character.dart';
 import '../../../models/enums.dart';
 import '../../../models/equipment.dart';
 import '../../../providers/audio_provider.dart';
+import '../../../data/mutator_data.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../providers/player_profile_provider.dart';
 import '../../../services/audio_service.dart';
@@ -39,7 +40,8 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
     final random = Random();
 
     _loot = pool[random.nextInt(pool.length)];
-    _goldFound = 10 + random.nextInt(20) * gameState.currentMapNumber;
+    final treasureGoldMultiplier = getMutatorEffect(gameState.activeMutator, 'treasure_gold');
+    _goldFound = ((10 + random.nextInt(20) * gameState.currentMapNumber) * treasureGoldMultiplier).round();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(audioProvider.notifier).playSfx(SfxType.goldPickup);
       _checkForLoreDrop();

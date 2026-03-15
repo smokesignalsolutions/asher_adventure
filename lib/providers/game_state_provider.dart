@@ -14,6 +14,7 @@ import '../services/map_service.dart';
 import '../services/progression_service.dart';
 import '../models/player_profile.dart';
 import '../services/save_service.dart';
+import '../data/mutator_data.dart';
 import '../services/scouting_service.dart';
 
 const _uuid = Uuid();
@@ -114,8 +115,10 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       activeMutator: activeMutator,
     );
 
-    // Scout from starting position
-    ScoutingService.scoutAdjacentNodes(state!.currentMap, state!.party);
+    // Scout from starting position (unless scouting is disabled by mutator)
+    if (activeMutator != 'fog_of_war') {
+      ScoutingService.scoutAdjacentNodes(state!.currentMap, state!.party);
+    }
     await _autoSave();
   }
 
@@ -152,8 +155,11 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       state!.currentMap.armyColumn += 1.0;
     }
 
-    // Scout adjacent nodes
-    ScoutingService.scoutAdjacentNodes(state!.currentMap, state!.party);
+    // Scout adjacent nodes (unless scouting is disabled by mutator)
+    final scoutingDisabled = state!.activeMutator == 'fog_of_war';
+    if (!scoutingDisabled) {
+      ScoutingService.scoutAdjacentNodes(state!.currentMap, state!.party);
+    }
 
     state = _refreshState();
     await _autoSave();
@@ -165,16 +171,20 @@ class GameStateNotifier extends StateNotifier<GameState?> {
   }
 
   double _getArmySpeed() {
+    double speed;
     switch (state!.difficulty) {
       case DifficultyLevel.easy:
-        return 3.0;
+        speed = 3.0;
       case DifficultyLevel.normal:
-        return 2.0;
+        speed = 2.0;
       case DifficultyLevel.hard:
-        return 1.5;
+        speed = 1.5;
       case DifficultyLevel.nightmare:
-        return 1.0;
+        speed = 1.0;
     }
+    // Lower speed = faster army. Mutator > 1.0 means faster, so divide.
+    final mutator = getMutatorEffect(state!.activeMutator, 'army_speed');
+    return speed / mutator;
   }
 
   List<Enemy> generateEnemies() {
@@ -259,8 +269,10 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       ProgressionService.addXp(char, xpGained);
     }
 
-    state!.gold += goldGained;
-    state!.totalGoldEarned += goldGained;
+    final goldMultiplier = getMutatorEffect(state!.activeMutator, 'gold_drop');
+    final adjustedGold = (goldGained * goldMultiplier).round();
+    state!.gold += adjustedGold;
+    state!.totalGoldEarned += adjustedGold;
 
     // Track enemy types killed this run
     state!.uniqueEnemyTypesKilledThisRun.addAll(killedEnemyTypes);
@@ -283,11 +295,21 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     await _autoSave();
   }
 
-  Future<void> restParty() async {
+  Future<void> restParty({double healFraction = 1.0}) async {
     if (state == null) return;
-    // Revive dead characters and heal everyone to full
+    // Revive dead characters and heal everyone
     for (final char in state!.party) {
-      char.currentHp = char.totalMaxHp;
+      if (healFraction >= 1.0) {
+        char.currentHp = char.totalMaxHp;
+      } else {
+        // Revive dead characters to the heal fraction amount
+        if (!char.isAlive) {
+          char.currentHp = (char.totalMaxHp * healFraction).round();
+        } else {
+          final healAmount = (char.totalMaxHp * healFraction).round();
+          char.currentHp = (char.currentHp + healAmount).clamp(0, char.totalMaxHp);
+        }
+      }
     }
     state = _refreshState();
     await _autoSave();
@@ -361,7 +383,9 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       activeMutator: state!.activeMutator,
     );
 
-    ScoutingService.scoutAdjacentNodes(state!.currentMap, state!.party);
+    if (state!.activeMutator != 'fog_of_war') {
+      ScoutingService.scoutAdjacentNodes(state!.currentMap, state!.party);
+    }
     await _autoSave();
   }
 

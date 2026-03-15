@@ -6,6 +6,7 @@ import '../../../data/equipment_data.dart';
 import '../../../models/character.dart';
 import '../../../models/equipment.dart';
 import '../../../providers/audio_provider.dart';
+import '../../../data/mutator_data.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../services/audio_service.dart';
 import '../../widgets/audio_controls.dart';
@@ -20,6 +21,7 @@ class ShopScreen extends ConsumerStatefulWidget {
 class _ShopScreenState extends ConsumerState<ShopScreen> {
   late List<Equipment> _stockItems;
   bool _stockGenerated = false;
+  double _shopCostMultiplier = 1.0;
 
   List<Equipment> _generateStock(int mapNumber, String nodeId) {
     final allItems = shopItemsByMap[mapNumber] ?? [];
@@ -44,11 +46,12 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
         gameState.currentMapNumber,
         gameState.currentMap.currentNodeId,
       );
+      _shopCostMultiplier = getMutatorEffect(gameState.activeMutator, 'shop_cost');
       _stockGenerated = true;
     }
 
     final theme = Theme.of(context);
-    final potionCost = _potionCost(gameState.currentMapNumber);
+    final potionCost = (_potionCost(gameState.currentMapNumber) * _shopCostMultiplier).round();
 
     return Scaffold(
       appBar: AppBar(
@@ -124,7 +127,8 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                   ),
                 // --- Equipment section ---
                 ..._stockItems.map((item) {
-                  final canAfford = gameState.gold >= item.value;
+                  final adjustedPrice = (item.value * _shopCostMultiplier).round();
+                  final canAfford = gameState.gold >= adjustedPrice;
                   return Card(
                     child: ListTile(
                       title: Text(item.name),
@@ -133,7 +137,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                         onPressed: canAfford
                             ? () => _showEquipDialog(item)
                             : null,
-                        child: Text('${item.value}g'),
+                        child: Text('${adjustedPrice}g'),
                       ),
                     ),
                   );
@@ -196,6 +200,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
   }
 
   void _buyAndEquip(Equipment item, Character char) {
+    final adjustedPrice = (item.value * _shopCostMultiplier).round();
     final oldItem = char.equipment[item.slot];
     int sellBack = 0;
     if (oldItem != null) {
@@ -203,7 +208,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
     }
     char.equipment[item.slot] = item;
     ref.read(audioProvider.notifier).playSfx(SfxType.goldPickup);
-    ref.read(gameStateProvider.notifier).spendGold(item.value);
+    ref.read(gameStateProvider.notifier).spendGold(adjustedPrice);
     if (sellBack > 0) {
       ref.read(gameStateProvider.notifier).addGold(sellBack);
     }

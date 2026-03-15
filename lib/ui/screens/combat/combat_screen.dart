@@ -14,6 +14,7 @@ import '../../../data/map_backgrounds.dart';
 import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../services/audio_service.dart';
+import '../../../data/mutator_data.dart';
 import '../../../services/combat_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,10 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
   // Army fight flag
   bool _isArmyFight = false;
 
+  // Mutator multipliers
+  double _enemyDamageMultiplier = 1.0;
+  double _healingMultiplier = 1.0;
+
   // Background
   late String _backgroundPath;
 
@@ -78,6 +83,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     if (gameState == null) return;
 
     _backgroundPath = combatBackground(gameState.currentMapNumber);
+    _enemyDamageMultiplier = getMutatorEffect(gameState.activeMutator, 'enemy_damage');
+    _healingMultiplier = getMutatorEffect(gameState.activeMutator, 'healing');
 
     final notifier = ref.read(gameStateProvider.notifier);
     final currentNode = gameState.currentMap.currentNode;
@@ -145,7 +152,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       final allyHpBefore = {for (final a in _combat!.allies) a.id: a.currentHp};
       final enemyHpBefore = enemy.currentHp;
 
-      final log = CombatService.executeEnemyTurn(enemy, _combat!.allies);
+      final log = CombatService.executeEnemyTurn(enemy, _combat!.allies, enemyDamageMultiplier: _enemyDamageMultiplier);
 
       // Build attack lines from HP diffs
       final lines = <_AttackLineData>[];
@@ -239,17 +246,17 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     } else if (ability.targetType == AbilityTarget.allEnemies) {
       final logs = <String>[];
       for (final enemy in _combat!.enemies.where((e) => e.isAlive)) {
-        logs.add(CombatService.executeAllyTurn(char, ability, enemy));
+        logs.add(CombatService.executeAllyTurn(char, ability, enemy, healingMultiplier: _healingMultiplier));
       }
       log = logs.join(' ');
     } else if (ability.targetType == AbilityTarget.allAllies) {
       final logs = <String>[];
       for (final ally in _combat!.allies.where((a) => a.isAlive)) {
-        logs.add(CombatService.executeAllyTurn(char, ability, ally));
+        logs.add(CombatService.executeAllyTurn(char, ability, ally, healingMultiplier: _healingMultiplier));
       }
       log = logs.join(' ');
     } else {
-      log = CombatService.executeAllyTurn(char, ability, target);
+      log = CombatService.executeAllyTurn(char, ability, target, healingMultiplier: _healingMultiplier);
     }
 
     // Chaotic bounce: 50% chance to hit another random enemy

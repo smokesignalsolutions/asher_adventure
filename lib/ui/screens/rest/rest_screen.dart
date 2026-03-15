@@ -1,6 +1,8 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../data/mutator_data.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../widgets/audio_controls.dart';
 
@@ -15,6 +17,9 @@ class RestScreen extends ConsumerWidget {
     }
 
     final theme = Theme.of(context);
+    final healFraction = getMutatorEffect(gameState.activeMutator, 'rest_heal');
+    final isPartialHeal = healFraction < 1.0;
+    final healPercent = (healFraction * 100).round();
 
     return Scaffold(
       appBar: AppBar(
@@ -37,45 +42,59 @@ class RestScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Your party rests and recovers their strength.',
+                isPartialHeal
+                    ? 'Your party rests briefly and recovers $healPercent% of their strength.'
+                    : 'Your party rests and recovers their strength.',
                 style: theme.textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
 
               // Show party HP before rest
-              ...gameState.party.map((c) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 120,
-                      child: Text(c.name.split(' ').first),
-                    ),
-                    if (!c.isAlive)
-                      Text(
-                        'KO -> REVIVE!',
-                        style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.bold),
-                      )
-                    else ...[
-                      Text('${c.currentHp}/${c.totalMaxHp} HP'),
-                      if (c.currentHp < c.totalMaxHp)
+              ...gameState.party.map((c) {
+                final int targetHp;
+                if (!c.isAlive) {
+                  targetHp = healFraction >= 1.0 ? c.totalMaxHp : (c.totalMaxHp * healFraction).round();
+                } else {
+                  if (healFraction >= 1.0) {
+                    targetHp = c.totalMaxHp;
+                  } else {
+                    targetHp = min(c.totalMaxHp, c.currentHp + (c.totalMaxHp * healFraction).round());
+                  }
+                }
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 120,
+                        child: Text(c.name.split(' ').first),
+                      ),
+                      if (!c.isAlive)
                         Text(
-                          ' -> ${c.totalMaxHp}',
-                          style: TextStyle(color: Colors.green.shade600, fontWeight: FontWeight.bold),
-                        ),
+                          'KO -> REVIVE ($targetHp HP)',
+                          style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.bold),
+                        )
+                      else ...[
+                        Text('${c.currentHp}/${c.totalMaxHp} HP'),
+                        if (c.currentHp < targetHp)
+                          Text(
+                            ' -> $targetHp',
+                            style: TextStyle(color: Colors.green.shade600, fontWeight: FontWeight.bold),
+                          ),
+                      ],
                     ],
-                  ],
-                ),
-              )),
+                  ),
+                );
+              }),
 
               const SizedBox(height: 32),
               SizedBox(
                 width: 220,
                 child: FilledButton.icon(
                   onPressed: () {
-                    ref.read(gameStateProvider.notifier).restParty();
+                    ref.read(gameStateProvider.notifier).restParty(healFraction: healFraction);
                     context.go('/map');
                   },
                   icon: const Icon(Icons.favorite),
