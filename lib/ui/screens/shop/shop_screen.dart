@@ -8,8 +8,12 @@ import '../../../models/equipment.dart';
 import '../../../providers/audio_provider.dart';
 import '../../../data/mutator_data.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../providers/help_mode_provider.dart';
 import '../../../services/audio_service.dart';
 import '../../widgets/audio_controls.dart';
+import '../../widgets/help_button.dart';
+import '../../widgets/help_dialogs.dart';
+import '../../widgets/character_detail_card.dart';
 
 class ShopScreen extends ConsumerStatefulWidget {
   const ShopScreen({super.key});
@@ -57,6 +61,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
       appBar: AppBar(
         title: const Text('Shop'),
         actions: [
+          const HelpButton(),
           const AudioMuteButton(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -108,7 +113,30 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                     subtitle: const Text('Heals 40% of a character\'s max HP'),
                     trailing: FilledButton(
                       onPressed: gameState.gold >= potionCost
-                          ? () => _buyPotion(potionCost)
+                          ? () {
+                              final helpMode = ref.read(helpModeProvider);
+                              if (helpMode) {
+                                ref.read(helpModeProvider.notifier).state = false;
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Health Potion'),
+                                    content: const Text(
+                                      'Heals 40% of a character\'s max HP. '
+                                      'Use potions during combat to keep your party alive!',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text('Close'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                return;
+                              }
+                              _buyPotion(potionCost);
+                            }
                           : null,
                       child: Text('${potionCost}g'),
                     ),
@@ -135,13 +163,39 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                       subtitle: Text(_itemStats(item)),
                       trailing: FilledButton(
                         onPressed: canAfford
-                            ? () => _showEquipDialog(item)
+                            ? () {
+                                final helpMode = ref.read(helpModeProvider);
+                                if (helpMode) {
+                                  ref.read(helpModeProvider.notifier).state = false;
+                                  showItemHelp(context, item);
+                                  return;
+                                }
+                                _showEquipDialog(item);
+                              }
                             : null,
                         child: Text('${adjustedPrice}g'),
                       ),
                     ),
                   );
                 }),
+                const SizedBox(height: 16),
+                Text('Your Party', style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                )),
+                const SizedBox(height: 8),
+                ...gameState.party.map((char) => Card(
+                  child: InkWell(
+                    onTap: () => showCharacterHelp(context, char),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: CharacterDetailCard(
+                        character: char,
+                        showAbilities: false,
+                      ),
+                    ),
+                  ),
+                )),
               ],
             ),
           ),
