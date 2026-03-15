@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/player_profile.dart';
+import '../models/enums.dart';
 import '../services/save_service.dart';
 
 class PlayerProfileNotifier extends StateNotifier<PlayerProfile?> {
@@ -31,6 +32,37 @@ class PlayerProfileNotifier extends StateNotifier<PlayerProfile?> {
     }
     state = PlayerProfile.fromJson(state!.toJson()); // refresh
     await _save();
+  }
+
+  Future<bool> purchaseClassUnlock(CharacterClass cls, int cost) async {
+    if (state == null || state!.legacyPoints < cost) return false;
+    if (state!.unlockedClasses.contains(cls)) return false;
+    state!.legacyPoints -= cost;
+    state!.unlockedClasses.add(cls);
+    state = PlayerProfile.fromJson(state!.toJson());
+    await _save();
+    return true;
+  }
+
+  Future<bool> purchasePassiveBonus(String bonusId, int cost, int maxRanks) async {
+    if (state == null || state!.legacyPoints < cost) return false;
+    final currentRank = state!.passiveBonuses[bonusId] ?? 0;
+    if (currentRank >= maxRanks) return false;
+    state!.legacyPoints -= cost;
+    state!.passiveBonuses[bonusId] = currentRank + 1;
+    state = PlayerProfile.fromJson(state!.toJson());
+    await _save();
+    return true;
+  }
+
+  Future<bool> purchasePerk(String perkId, int cost) async {
+    if (state == null || state!.legacyPoints < cost) return false;
+    if (state!.unlockedPerks.contains(perkId)) return false;
+    state!.legacyPoints -= cost;
+    state!.unlockedPerks.add(perkId);
+    state = PlayerProfile.fromJson(state!.toJson());
+    await _save();
+    return true;
   }
 
   Future<void> _save() async {
