@@ -468,12 +468,21 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     }
     final enemyIdx = _combat!.enemies.indexWhere((e) => e.id == id);
     if (enemyIdx >= 0) {
-      final n = _combat!.enemies.length;
-      final sprite = _spriteSize(n);
-      return Offset(
-        size.width * 0.75 - sprite / 2 - 4, // left edge of enemy sprite
-        size.height * (enemyIdx + 1) / (n + 1),
-      );
+      final enemies = _combat!.enemies;
+      final totalCols = enemies.length <= 3 ? 1 : enemies.length <= 6 ? 2 : 3;
+      final rowsPerCol = (enemies.length / totalCols).ceil();
+      final gridCol = enemyIdx ~/ rowsPerCol;
+      final gridRow = enemyIdx % rowsPerCol;
+      final colEnemyCount = (gridCol < totalCols - 1)
+          ? rowsPerCol
+          : enemies.length - gridCol * rowsPerCol;
+
+      // X: right half (0.5-1.0), spread across grid columns
+      final colWidth = 0.5 / totalCols;
+      final x = size.width * (0.5 + colWidth * gridCol + colWidth / 2);
+      // Y: spread within column
+      final y = size.height * (gridRow + 1) / (colEnemyCount + 1);
+      return Offset(x, y);
     }
     return size.center(Offset.zero);
   }
@@ -677,31 +686,12 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                       ),
                     ),
                   ),
-                  // ENEMIES (right)
+                  // ENEMIES (right) — grid layout for many enemies
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           vertical: 8, horizontal: 4),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: _combat!.enemies.map((enemy) {
-                          final isTarget = _selectedAbility != null &&
-                              _selectedAbility!.damage > 0 &&
-                              _selectedAbility!.targetType ==
-                                  AbilityTarget.singleEnemy &&
-                              enemy.isAlive;
-                          return Flexible(
-                            child: GestureDetector(
-                              onTap: isTarget
-                                  ? () =>
-                                      _useAbility(_selectedAbility!, enemy)
-                                  : null,
-                              child: _buildEnemyWidget(
-                                  theme, enemy, isTarget),
-                            ),
-                          );
-                        }).toList(),
-                      ),
+                      child: _buildEnemyGrid(theme),
                     ),
                   ),
                 ],
@@ -725,6 +715,45 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           ],
         );
       },
+    );
+  }
+
+  // -- Enemy grid (up to 3x3) ------------------------------------------------
+  Widget _buildEnemyGrid(ThemeData theme) {
+    final enemies = _combat!.enemies;
+    final cols = enemies.length <= 3 ? 1 : enemies.length <= 6 ? 2 : 3;
+    final rows = (enemies.length / cols).ceil();
+
+    // Split enemies into grid columns
+    final gridCols = <List<Enemy>>[];
+    for (int c = 0; c < cols; c++) {
+      final start = c * rows;
+      final end = (start + rows).clamp(0, enemies.length);
+      if (start < enemies.length) {
+        gridCols.add(enemies.sublist(start, end));
+      }
+    }
+
+    return Row(
+      children: gridCols.map((colEnemies) => Expanded(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: colEnemies.map((enemy) {
+            final isTarget = _selectedAbility != null &&
+                _selectedAbility!.damage > 0 &&
+                _selectedAbility!.targetType == AbilityTarget.singleEnemy &&
+                enemy.isAlive;
+            return Flexible(
+              child: GestureDetector(
+                onTap: isTarget
+                    ? () => _useAbility(_selectedAbility!, enemy)
+                    : null,
+                child: _buildEnemyWidget(theme, enemy, isTarget),
+              ),
+            );
+          }).toList(),
+        ),
+      )).toList(),
     );
   }
 
