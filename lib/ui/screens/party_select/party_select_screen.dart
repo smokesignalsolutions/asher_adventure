@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/class_data.dart';
 import '../../../models/enums.dart';
+import '../../../models/player_profile.dart';
 import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../providers/player_profile_provider.dart';
 import '../../../services/audio_service.dart';
 import '../../widgets/audio_controls.dart';
 
@@ -19,12 +21,13 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
   final _selectedClasses = <CharacterClass>[];
   DifficultyLevel _difficulty = DifficultyLevel.normal;
 
-  // For now, only starter classes are available
-  // TODO: check achievements to unlock more
-  final _unlockedClasses = CharacterClass.values.where((c) {
-    final def = classDefinitions[c];
-    return def != null && def.unlockedByDefault;
-  }).toList();
+  List<CharacterClass> get _unlockedClasses {
+    final profile = ref.read(playerProfileProvider);
+    if (profile == null) {
+      return PlayerProfile.starterClasses;
+    }
+    return profile.unlockedClasses;
+  }
 
   void _toggleClass(CharacterClass cls) {
     ref.read(audioProvider.notifier).playSfx(SfxType.menuSelect);
