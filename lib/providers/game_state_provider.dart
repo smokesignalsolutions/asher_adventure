@@ -192,74 +192,64 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     return speed / mutator;
   }
 
+  Enemy _enemyFromTemplate(EnemyTemplate template) => Enemy(
+    id: _uuid.v4(),
+    name: template.name,
+    type: template.type,
+    currentHp: template.hp,
+    maxHp: template.hp,
+    attack: template.attack,
+    defense: template.defense,
+    speed: template.speed,
+    magic: template.magic,
+    xpReward: template.xpReward,
+    goldReward: template.goldReward,
+    abilities: template.abilities
+        .map((a) => Ability(
+              name: a.name,
+              description: a.description,
+              damage: a.damage,
+              refreshChance: a.refreshChance,
+              targetType: a.targetType,
+              unlockedAtLevel: a.unlockedAtLevel,
+              isBasicAttack: a.isBasicAttack,
+            ))
+        .toList(),
+  );
+
   List<Enemy> generateEnemies() {
     if (state == null) return [];
     final mapNum = state!.currentMapNumber;
     final templates = enemiesByMap[mapNum] ?? enemiesByMap[1]!;
-    // Scale enemy count with party size: solo=1, 2 party=1-2, 3+=1-3
+    // Base count from party size + 1-3 extra
     final partySize = state!.party.where((c) => c.isAlive).length;
-    final maxEnemies = partySize <= 1 ? 1 : partySize <= 2 ? 2 : 3;
-    final count = 1 + _random.nextInt(maxEnemies); // 1 to maxEnemies
+    final baseMax = partySize <= 1 ? 1 : partySize <= 2 ? 2 : 3;
+    final extra = 1 + _random.nextInt(3); // 1-3 extra
+    final count = (1 + _random.nextInt(baseMax)) + extra;
 
     return List.generate(count, (_) {
       final template = templates[_random.nextInt(templates.length)];
-      return Enemy(
-        id: _uuid.v4(),
-        name: template.name,
-        type: template.type,
-        currentHp: template.hp,
-        maxHp: template.hp,
-        attack: template.attack,
-        defense: template.defense,
-        speed: template.speed,
-        magic: template.magic,
-        xpReward: template.xpReward,
-        goldReward: template.goldReward,
-        abilities: template.abilities
-            .map((a) => Ability(
-                  name: a.name,
-                  description: a.description,
-                  damage: a.damage,
-                  refreshChance: a.refreshChance,
-                  targetType: a.targetType,
-                  unlockedAtLevel: a.unlockedAtLevel,
-                  isBasicAttack: a.isBasicAttack,
-                ))
-            .toList(),
-      );
+      return _enemyFromTemplate(template);
     });
   }
 
   List<Enemy> generateBoss() {
     if (state == null) return [];
     final mapNum = state!.currentMapNumber;
-    final template = bossByMap[mapNum] ?? bossByMap[1]!;
-    return [
-      Enemy(
-        id: _uuid.v4(),
-        name: template.name,
-        type: template.type,
-        currentHp: template.hp,
-        maxHp: template.hp,
-        attack: template.attack,
-        defense: template.defense,
-        speed: template.speed,
-        magic: template.magic,
-        xpReward: template.xpReward,
-        goldReward: template.goldReward,
-        abilities: template.abilities
-            .map((a) => Ability(
-                  name: a.name,
-                  description: a.description,
-                  damage: a.damage,
-                  refreshChance: a.refreshChance,
-                  targetType: a.targetType,
-                  unlockedAtLevel: a.unlockedAtLevel,
-                  isBasicAttack: a.isBasicAttack,
-                ))
-            .toList(),
-      ),
-    ];
+    final bossTemplate = bossByMap[mapNum] ?? bossByMap[1]!;
+
+    final enemies = <Enemy>[_enemyFromTemplate(bossTemplate)];
+
+    // Add 2-10 minions from current map's enemy pool
+    // (map 1 uses its own enemies since there's no previous map)
+    final minionTemplates = enemiesByMap[mapNum] ?? enemiesByMap[1]!;
+    final minionCount = 2 + _random.nextInt(9); // 2-10
+    for (int i = 0; i < minionCount; i++) {
+      final template = minionTemplates[_random.nextInt(minionTemplates.length)];
+      enemies.add(_enemyFromTemplate(template));
+    }
+
+    return enemies;
   }
 
   Future<void> completeCombat(
