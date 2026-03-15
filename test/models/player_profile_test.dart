@@ -55,6 +55,19 @@ void main() {
       expect(profile.unlockedClasses.length, 4);
     });
 
+    test('codex fields serialize', () {
+      final profile = PlayerProfile(
+        bestiaryKills: {'goblin': 15, 'wolf': 3},
+        loreFound: {'lore_1_1', 'lore_2_3'},
+        classStoryProgress: {'fighter': 2, 'wizard': 1},
+      );
+      final json = profile.toJson();
+      final restored = PlayerProfile.fromJson(json);
+      expect(restored.bestiaryKills['goblin'], 15);
+      expect(restored.loreFound, contains('lore_1_1'));
+      expect(restored.classStoryProgress['fighter'], 2);
+    });
+
     test('passiveBonuses and unlockedPerks serialize', () {
       final profile = PlayerProfile(
         passiveBonuses: {'hp': 3, 'attack': 1},
