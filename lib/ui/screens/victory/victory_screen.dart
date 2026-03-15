@@ -44,6 +44,11 @@ class _VictoryScreenState extends ConsumerState<VictoryScreen> {
       isVictory: true,
     );
 
+    // Persist bestiary kills
+    if (snapshot.enemyKillCountsThisRun.isNotEmpty) {
+      await profileNotifier.recordEnemyKills(snapshot.enemyKillCountsThisRun);
+    }
+
     await gameNotifier.gameOver();
 
     if (mounted) {

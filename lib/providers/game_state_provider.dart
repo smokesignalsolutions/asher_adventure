@@ -130,6 +130,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     mapsCompletedThisRun: state!.mapsCompletedThisRun,
     bossesKilledThisRun: state!.bossesKilledThisRun,
     uniqueEnemyTypesKilledThisRun: Set.from(state!.uniqueEnemyTypesKilledThisRun),
+    enemyKillCountsThisRun: Map.from(state!.enemyKillCountsThisRun),
     activePerk: state!.activePerk,
   );
 
@@ -260,6 +261,10 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     // Track enemy types killed this run
     state!.uniqueEnemyTypesKilledThisRun.addAll(killedEnemyTypes);
+    // Track kill counts per type
+    for (final type in killedEnemyTypes) {
+      state!.enemyKillCountsThisRun[type] = (state!.enemyKillCountsThisRun[type] ?? 0) + 1;
+    }
     if (bossKilled) {
       state!.bossesKilledThisRun++;
     }
@@ -348,6 +353,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       mapsCompletedThisRun: state!.mapsCompletedThisRun + 1,
       bossesKilledThisRun: state!.bossesKilledThisRun,
       uniqueEnemyTypesKilledThisRun: state!.uniqueEnemyTypesKilledThisRun,
+      enemyKillCountsThisRun: state!.enemyKillCountsThisRun,
       activePerk: state!.activePerk,
     );
 

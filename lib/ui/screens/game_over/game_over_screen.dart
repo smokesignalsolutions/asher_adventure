@@ -47,10 +47,15 @@ class _GameOverScreenState extends ConsumerState<GameOverScreen> {
       isVictory: false,
     );
 
-    // Step 4: Delete run save
+    // Step 4: Persist bestiary kills
+    if (snapshot.enemyKillCountsThisRun.isNotEmpty) {
+      await profileNotifier.recordEnemyKills(snapshot.enemyKillCountsThisRun);
+    }
+
+    // Step 5: Delete run save
     await gameNotifier.gameOver();
 
-    // Step 5: Display
+    // Step 6: Display
     if (mounted) {
       setState(() => _lpResult = result);
     }
