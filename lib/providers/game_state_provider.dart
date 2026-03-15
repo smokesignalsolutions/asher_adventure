@@ -34,6 +34,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     DifficultyLevel difficulty, {
     PlayerProfile? profile,
     String? activePerk,
+    String? activeMutator,
   }) async {
     NameGenerator.reset();
     final party = <Character>[];
@@ -110,6 +111,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       currentMap: map,
       difficulty: difficulty,
       activePerk: activePerk,
+      activeMutator: activeMutator,
     );
 
     // Scout from starting position

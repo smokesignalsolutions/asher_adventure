@@ -1,8 +1,10 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/class_data.dart';
 import '../../../data/legacy_data.dart';
+import '../../../data/mutator_data.dart';
 import '../../../models/enums.dart';
 import '../../../models/player_profile.dart';
 import '../../../providers/audio_provider.dart';
@@ -53,6 +55,8 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
   Future<void> _startGame() async {
     if (_selectedClasses.length != 4) return;
 
+    final mutator = runMutators[Random().nextInt(runMutators.length)];
+
     final profile = ref.read(playerProfileProvider);
     final notifier = ref.read(gameStateProvider.notifier);
     await notifier.startNewGame(
@@ -60,6 +64,7 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
       _difficulty,
       profile: profile,
       activePerk: _selectedPerk,
+      activeMutator: mutator.id,
     );
 
     if (mounted) context.go('/map');

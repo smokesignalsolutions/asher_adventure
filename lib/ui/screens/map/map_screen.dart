@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/map_backgrounds.dart';
+import '../../../data/mutator_data.dart';
 import '../../../models/enums.dart';
 import '../../../models/map_node.dart';
 import '../../../providers/game_state_provider.dart';
@@ -10,11 +11,53 @@ import '../../../services/progression_service.dart';
 import '../../../services/scouting_service.dart';
 import '../../widgets/audio_controls.dart';
 
-class MapScreen extends ConsumerWidget {
+class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MapScreen> createState() => _MapScreenState();
+}
+
+class _MapScreenState extends ConsumerState<MapScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showMutatorAnnouncement());
+  }
+
+  void _showMutatorAnnouncement() {
+    final gameState = ref.read(gameStateProvider);
+    if (gameState == null) return;
+    if (gameState.currentMapNumber != 1) return;
+    if (gameState.mapsCompletedThisRun > 0) return;
+
+    final mutator = getMutatorById(gameState.activeMutator);
+    if (mutator == null) return;
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.auto_awesome, color: Colors.amber),
+            const SizedBox(width: 8),
+            Expanded(child: Text(mutator.name)),
+          ],
+        ),
+        content: Text(mutator.description),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Begin!'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final gameState = ref.watch(gameStateProvider);
     if (gameState == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => context.go('/'));
@@ -172,7 +215,7 @@ class MapScreen extends ConsumerWidget {
                             radius: nodeRadius,
                             onTap: currentNode.connections.contains(node.id) &&
                                     node.id != currentNode.id
-                                ? () => _moveToNode(context, ref, node)
+                                ? () => _moveToNode(node)
                                 : null,
                           ),
                         ),
@@ -187,7 +230,7 @@ class MapScreen extends ConsumerWidget {
     );
   }
 
-  void _moveToNode(BuildContext context, WidgetRef ref, MapNode node) {
+  void _moveToNode(MapNode node) {
     final notifier = ref.read(gameStateProvider.notifier);
 
     // Safety: if army was already past player before this move, push it back
