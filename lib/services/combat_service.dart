@@ -164,13 +164,32 @@ class CombatService {
     if (ability.damage > 0) {
       // --- OFFENSIVE: damage + optional debuffs/drain/vulnerability ---
       final Enemy enemyTarget = target as Enemy;
+
+      // ChainCast: AOE bonus, single-target penalty
+      double chainCastMult = 1.0;
+      if (attacker.equipment[EquipmentSlot.weapon]?.specialEffect == SpecialEffect.chainCast) {
+        if (ability.targetType == AbilityTarget.allEnemies) {
+          chainCastMult = 1.5;
+        } else if (ability.targetType == AbilityTarget.singleEnemy) {
+          chainCastMult = 0.7;
+        }
+      }
+
       final damage = calculateDamage(
         attacker.totalAttack, ability.damage, enemyTarget.effectiveDefense,
         targetVulnerable: enemyTarget.isVulnerable,
         chaotic: ability.chaotic,
+        damageMultiplier: chainCastMult,
       );
       enemyTarget.currentHp = max(0, enemyTarget.currentHp - damage);
       logs.add('${attacker.name} uses ${ability.name} on ${enemyTarget.name} for $damage damage!');
+
+      // Vampiric: heal for 25% of damage dealt
+      if (attacker.equipment[EquipmentSlot.weapon]?.specialEffect == SpecialEffect.vampiric && damage > 0) {
+        final vampHeal = (damage * 0.25).round();
+        attacker.currentHp = min(attacker.totalMaxHp, attacker.currentHp + vampHeal);
+        logs.add('Drains $vampHeal HP!');
+      }
 
       if (ability.lifeDrain) {
         final healAmount = (damage * 0.5).round();
@@ -280,6 +299,17 @@ class CombatService {
         final damage = calculateDamage(enemy.effectiveAttack, ability.damage, ally.totalDefense, damageMultiplier: enemyDamageMultiplier);
         ally.currentHp = max(0, ally.currentHp - damage);
         logs.add('${ally.name} takes $damage damage');
+
+        // Thorns: reflect 15% damage back
+        final allyOffhand = ally.equipment[EquipmentSlot.offhand];
+        if (allyOffhand?.specialEffect == SpecialEffect.thorns && damage > 0) {
+          final thornsDamage = (damage * 0.15).round();
+          if (thornsDamage > 0) {
+            enemy.currentHp -= thornsDamage;
+            logs.add('Thorns reflect $thornsDamage!');
+          }
+        }
+
         if (!ally.isAlive) logs.add('${ally.name} falls!');
       }
       if (!ability.isBasicAttack) ability.isAvailable = false;
@@ -292,6 +322,17 @@ class CombatService {
     target.currentHp = max(0, target.currentHp - damage);
     if (!ability.isBasicAttack) ability.isAvailable = false;
     logs.add('${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!');
+
+    // Thorns: reflect 15% damage back
+    final offhand = target.equipment[EquipmentSlot.offhand];
+    if (offhand?.specialEffect == SpecialEffect.thorns && damage > 0) {
+      final thornsDamage = (damage * 0.15).round();
+      if (thornsDamage > 0) {
+        enemy.currentHp -= thornsDamage;
+        logs.add('Thorns reflect $thornsDamage!');
+      }
+    }
+
     if (!target.isAlive) logs.add('${target.name} falls!');
     return logs.join(' ');
   }
