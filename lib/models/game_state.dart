@@ -15,6 +15,7 @@ class GameState {
   int mapsCompletedThisRun;
   int bossesKilledThisRun;
   Set<String> uniqueEnemyTypesKilledThisRun;
+  String? activePerk;
 
   GameState({
     required this.party,
@@ -29,6 +30,7 @@ class GameState {
     this.mapsCompletedThisRun = 0,
     this.bossesKilledThisRun = 0,
     Set<String>? uniqueEnemyTypesKilledThisRun,
+    this.activePerk,
   }) : uniqueEnemyTypesKilledThisRun = uniqueEnemyTypesKilledThisRun ?? {};
 
   Map<String, dynamic> toJson() => {
@@ -44,6 +46,7 @@ class GameState {
     'mapsCompletedThisRun': mapsCompletedThisRun,
     'bossesKilledThisRun': bossesKilledThisRun,
     'uniqueEnemyTypesKilledThisRun': uniqueEnemyTypesKilledThisRun.toList(),
+    'activePerk': activePerk,
   };
 
   factory GameState.fromJson(Map<String, dynamic> json) => GameState(
@@ -63,5 +66,6 @@ class GameState {
     uniqueEnemyTypesKilledThisRun: json['uniqueEnemyTypesKilledThisRun'] != null
         ? Set<String>.from(json['uniqueEnemyTypesKilledThisRun'])
         : null,
+    activePerk: json['activePerk'] as String?,
   );
 }
