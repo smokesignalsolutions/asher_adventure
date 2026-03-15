@@ -19,6 +19,8 @@ enum MusicTrack {
 
 enum SfxType {
   attackHit('audio/sfx/attack_hit.wav'),
+  meleeHit('audio/sfx/melee_hit.wav'),
+  spellCast('audio/sfx/spell_cast.wav'),
   levelUp('audio/sfx/level_up.wav'),
   goldPickup('audio/sfx/gold_pickup.wav'),
   menuSelect('audio/sfx/menu_select.wav');
@@ -76,7 +78,8 @@ class AudioService {
   Future<void> playSfx(SfxType sfx) async {
     if (_muted) return;
     await _sfxPlayer.stop();
-    await _sfxPlayer.setVolume(_volume);
+    // SFX play louder than music (1.3x, capped at 1.0)
+    await _sfxPlayer.setVolume((_volume * 1.3).clamp(0.0, 1.0));
     await _sfxPlayer.play(AssetSource(sfx.assetPath));
   }
 

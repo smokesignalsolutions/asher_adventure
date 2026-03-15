@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/ability_icons.dart';
+import '../../../data/class_data.dart';
 import '../../widgets/idle_animated_sprite.dart';
 import '../../../data/sprite_data.dart';
 import '../../../models/ability.dart';
@@ -297,7 +298,10 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     }
 
     if (lines.isNotEmpty) {
-      ref.read(audioProvider.notifier).playSfx(SfxType.attackHit);
+      final isMagicUser = magicDamageClasses.contains(char.characterClass);
+      ref.read(audioProvider.notifier).playSfx(
+        isMagicUser ? SfxType.spellCast : SfxType.meleeHit,
+      );
     }
 
     setState(() {
