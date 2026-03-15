@@ -7,6 +7,8 @@ class PlayerProfile {
   int totalVictories;
   int furthestMap;
   List<CharacterClass> unlockedClasses;
+  Map<String, int> passiveBonuses;
+  List<String> unlockedPerks;
 
   static const List<CharacterClass> starterClasses = [
     CharacterClass.fighter,
@@ -22,7 +24,11 @@ class PlayerProfile {
     this.totalVictories = 0,
     this.furthestMap = 0,
     List<CharacterClass>? unlockedClasses,
-  }) : unlockedClasses = unlockedClasses ?? List.from(starterClasses);
+    Map<String, int>? passiveBonuses,
+    List<String>? unlockedPerks,
+  }) : unlockedClasses = unlockedClasses ?? List.from(starterClasses),
+       passiveBonuses = passiveBonuses ?? {},
+       unlockedPerks = unlockedPerks ?? [];
 
   Map<String, dynamic> toJson() => {
     'legacyPoints': legacyPoints,
@@ -31,6 +37,8 @@ class PlayerProfile {
     'totalVictories': totalVictories,
     'furthestMap': furthestMap,
     'unlockedClasses': unlockedClasses.map((c) => c.index).toList(),
+    'passiveBonuses': passiveBonuses,
+    'unlockedPerks': unlockedPerks,
   };
 
   factory PlayerProfile.fromJson(Map<String, dynamic> json) => PlayerProfile(
@@ -43,6 +51,12 @@ class PlayerProfile {
         ? (json['unlockedClasses'] as List)
             .map((i) => CharacterClass.values[i])
             .toList()
+        : null,
+    passiveBonuses: json['passiveBonuses'] != null
+        ? Map<String, int>.from(json['passiveBonuses'])
+        : null,
+    unlockedPerks: json['unlockedPerks'] != null
+        ? List<String>.from(json['unlockedPerks'])
         : null,
   );
 }

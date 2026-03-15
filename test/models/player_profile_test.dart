@@ -54,5 +54,18 @@ void main() {
       expect(profile.legacyPoints, 0);
       expect(profile.unlockedClasses.length, 4);
     });
+
+    test('passiveBonuses and unlockedPerks serialize', () {
+      final profile = PlayerProfile(
+        passiveBonuses: {'hp': 3, 'attack': 1},
+        unlockedPerks: ['scavenger', 'veteran'],
+      );
+      final json = profile.toJson();
+      final restored = PlayerProfile.fromJson(json);
+      expect(restored.passiveBonuses['hp'], 3);
+      expect(restored.passiveBonuses['attack'], 1);
+      expect(restored.unlockedPerks, contains('scavenger'));
+      expect(restored.unlockedPerks, contains('veteran'));
+    });
   });
 }
