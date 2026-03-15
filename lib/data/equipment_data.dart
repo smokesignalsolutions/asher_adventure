@@ -11,6 +11,8 @@ final Map<int, List<Equipment>> shopItemsByMap = {
     // Weapons
     const Equipment(id: 'iron_sword', name: 'Iron Sword', slot: EquipmentSlot.weapon, rarity: Rarity.common, attackBonus: 4, value: 30),
     const Equipment(id: 'gnarled_staff', name: 'Gnarled Staff', slot: EquipmentSlot.weapon, rarity: Rarity.common, magicBonus: 4, value: 30),
+    const Equipment(id: 'rusty_dagger', name: 'Rusty Dagger', slot: EquipmentSlot.weapon, rarity: Rarity.common, attackBonus: 2, speedBonus: 2, value: 30),
+    const Equipment(id: 'twig_wand', name: 'Twig Wand', slot: EquipmentSlot.weapon, rarity: Rarity.common, magicBonus: 2, speedBonus: 2, value: 30),
     // Offhand
     const Equipment(id: 'wooden_shield', name: 'Wooden Shield', slot: EquipmentSlot.offhand, rarity: Rarity.common, defenseBonus: 3, speedBonus: -1, value: 25),
     const Equipment(id: 'tome_of_sparks', name: 'Tome of Sparks', slot: EquipmentSlot.offhand, rarity: Rarity.common, magicBonus: 3, value: 25),
@@ -32,6 +34,8 @@ final Map<int, List<Equipment>> shopItemsByMap = {
     // Weapons
     const Equipment(id: 'steel_sword', name: 'Steel Sword', slot: EquipmentSlot.weapon, rarity: Rarity.uncommon, attackBonus: 6, value: 60),
     const Equipment(id: 'oak_staff', name: 'Oak Staff', slot: EquipmentSlot.weapon, rarity: Rarity.uncommon, magicBonus: 7, value: 60),
+    const Equipment(id: 'steel_dagger', name: 'Steel Dagger', slot: EquipmentSlot.weapon, rarity: Rarity.uncommon, attackBonus: 4, speedBonus: 2, value: 60),
+    const Equipment(id: 'oak_wand', name: 'Oak Wand', slot: EquipmentSlot.weapon, rarity: Rarity.uncommon, magicBonus: 4, speedBonus: 2, value: 60),
     // Offhand
     const Equipment(id: 'iron_shield', name: 'Iron Shield', slot: EquipmentSlot.offhand, rarity: Rarity.uncommon, defenseBonus: 5, hpBonus: 5, speedBonus: -1, value: 55),
     const Equipment(id: 'grimoire_of_flame', name: 'Grimoire of Flame', slot: EquipmentSlot.offhand, rarity: Rarity.uncommon, magicBonus: 4, hpBonus: 5, value: 55),
@@ -53,6 +57,8 @@ final Map<int, List<Equipment>> shopItemsByMap = {
     // Weapons
     const Equipment(id: 'enchanted_blade', name: 'Enchanted Blade', slot: EquipmentSlot.weapon, rarity: Rarity.rare, attackBonus: 8, value: 100),
     const Equipment(id: 'staff_of_storms', name: 'Staff of Storms', slot: EquipmentSlot.weapon, rarity: Rarity.rare, magicBonus: 10, value: 100),
+    const Equipment(id: 'enchanted_dagger', name: 'Enchanted Dagger', slot: EquipmentSlot.weapon, rarity: Rarity.rare, attackBonus: 5, speedBonus: 3, value: 100),
+    const Equipment(id: 'crystal_wand', name: 'Crystal Wand', slot: EquipmentSlot.weapon, rarity: Rarity.rare, magicBonus: 6, speedBonus: 3, value: 100),
     // Offhand
     const Equipment(id: 'tower_shield', name: 'Tower Shield', slot: EquipmentSlot.offhand, rarity: Rarity.rare, defenseBonus: 7, hpBonus: 10, speedBonus: -2, value: 90),
     const Equipment(id: 'orb_of_binding', name: 'Orb of Binding', slot: EquipmentSlot.offhand, rarity: Rarity.rare, magicBonus: 6, defenseBonus: 1, value: 90),
@@ -74,6 +80,8 @@ final Map<int, List<Equipment>> shopItemsByMap = {
     // Weapons
     const Equipment(id: 'runic_sword', name: 'Runic Sword', slot: EquipmentSlot.weapon, rarity: Rarity.rare, attackBonus: 11, value: 160),
     const Equipment(id: 'staff_of_the_void', name: 'Staff of the Void', slot: EquipmentSlot.weapon, rarity: Rarity.rare, magicBonus: 13, value: 160),
+    const Equipment(id: 'runic_dagger', name: 'Runic Dagger', slot: EquipmentSlot.weapon, rarity: Rarity.rare, attackBonus: 7, speedBonus: 3, value: 160),
+    const Equipment(id: 'runic_wand', name: 'Runic Wand', slot: EquipmentSlot.weapon, rarity: Rarity.rare, magicBonus: 8, speedBonus: 3, value: 160),
     // Offhand
     const Equipment(id: 'runic_shield', name: 'Runic Shield', slot: EquipmentSlot.offhand, rarity: Rarity.rare, defenseBonus: 9, hpBonus: 15, speedBonus: -2, value: 140),
     const Equipment(id: 'tome_of_shadows', name: 'Tome of Shadows', slot: EquipmentSlot.offhand, rarity: Rarity.rare, magicBonus: 8, defenseBonus: 2, value: 140),
@@ -95,6 +103,8 @@ final Map<int, List<Equipment>> shopItemsByMap = {
     // Weapons
     const Equipment(id: 'mythril_blade', name: 'Mythril Blade', slot: EquipmentSlot.weapon, rarity: Rarity.epic, attackBonus: 14, speedBonus: 1, value: 250),
     const Equipment(id: 'staff_of_elements', name: 'Staff of Elements', slot: EquipmentSlot.weapon, rarity: Rarity.epic, magicBonus: 16, value: 250),
+    const Equipment(id: 'mythril_dagger', name: 'Mythril Dagger', slot: EquipmentSlot.weapon, rarity: Rarity.epic, attackBonus: 9, speedBonus: 3, value: 250),
+    const Equipment(id: 'mythril_wand', name: 'Mythril Wand', slot: EquipmentSlot.weapon, rarity: Rarity.epic, magicBonus: 10, speedBonus: 3, value: 250),
     // Offhand
     const Equipment(id: 'mythril_shield', name: 'Mythril Shield', slot: EquipmentSlot.offhand, rarity: Rarity.epic, defenseBonus: 12, hpBonus: 20, speedBonus: -2, value: 220),
     const Equipment(id: 'crystal_orb', name: 'Crystal Orb', slot: EquipmentSlot.offhand, rarity: Rarity.epic, magicBonus: 10, defenseBonus: 3, value: 220),
@@ -116,6 +126,8 @@ final Map<int, List<Equipment>> shopItemsByMap = {
     // Weapons
     const Equipment(id: 'shadow_blade', name: 'Shadow Blade', slot: EquipmentSlot.weapon, rarity: Rarity.epic, attackBonus: 18, speedBonus: 2, defenseBonus: -2, value: 350),
     const Equipment(id: 'staff_of_the_cosmos', name: 'Staff of the Cosmos', slot: EquipmentSlot.weapon, rarity: Rarity.epic, magicBonus: 20, value: 350),
+    const Equipment(id: 'shadow_dagger', name: 'Shadow Dagger', slot: EquipmentSlot.weapon, rarity: Rarity.epic, attackBonus: 11, speedBonus: 4, value: 350),
+    const Equipment(id: 'void_wand', name: 'Void Wand', slot: EquipmentSlot.weapon, rarity: Rarity.epic, magicBonus: 12, speedBonus: 4, value: 350),
     // Offhand
     const Equipment(id: 'aegis', name: 'Aegis', slot: EquipmentSlot.offhand, rarity: Rarity.epic, defenseBonus: 15, hpBonus: 25, speedBonus: -3, value: 320),
     const Equipment(id: 'orb_of_eternity', name: 'Orb of Eternity', slot: EquipmentSlot.offhand, rarity: Rarity.epic, magicBonus: 12, defenseBonus: 4, value: 320),
@@ -137,6 +149,8 @@ final Map<int, List<Equipment>> shopItemsByMap = {
     // Weapons
     const Equipment(id: 'legendary_sword', name: 'Excalibur', slot: EquipmentSlot.weapon, rarity: Rarity.legendary, attackBonus: 24, speedBonus: 2, value: 500),
     const Equipment(id: 'staff_of_the_ancients', name: 'Staff of the Ancients', slot: EquipmentSlot.weapon, rarity: Rarity.legendary, magicBonus: 26, value: 500),
+    const Equipment(id: 'assassins_blade', name: "Assassin's Blade", slot: EquipmentSlot.weapon, rarity: Rarity.legendary, attackBonus: 15, speedBonus: 4, value: 500),
+    const Equipment(id: 'wand_of_the_ancients', name: 'Wand of the Ancients', slot: EquipmentSlot.weapon, rarity: Rarity.legendary, magicBonus: 16, speedBonus: 4, value: 500),
     // Offhand
     const Equipment(id: 'legendary_shield', name: "Paladin's Bastion", slot: EquipmentSlot.offhand, rarity: Rarity.legendary, defenseBonus: 18, hpBonus: 40, speedBonus: -3, value: 480),
     const Equipment(id: 'tome_of_the_void', name: 'Tome of the Void', slot: EquipmentSlot.offhand, rarity: Rarity.legendary, magicBonus: 16, defenseBonus: 5, value: 480),
@@ -158,6 +172,8 @@ final Map<int, List<Equipment>> shopItemsByMap = {
     // Weapons
     const Equipment(id: 'godslayer', name: 'Godslayer', slot: EquipmentSlot.weapon, rarity: Rarity.legendary, attackBonus: 30, speedBonus: 3, value: 800),
     const Equipment(id: 'staff_of_oblivion', name: 'Staff of Oblivion', slot: EquipmentSlot.weapon, rarity: Rarity.legendary, magicBonus: 32, value: 800),
+    const Equipment(id: 'godstrike_dagger', name: 'Godstrike Dagger', slot: EquipmentSlot.weapon, rarity: Rarity.legendary, attackBonus: 18, speedBonus: 5, value: 800),
+    const Equipment(id: 'wand_of_oblivion', name: 'Wand of Oblivion', slot: EquipmentSlot.weapon, rarity: Rarity.legendary, magicBonus: 20, speedBonus: 5, value: 800),
     // Offhand
     const Equipment(id: 'divine_aegis', name: 'Divine Aegis', slot: EquipmentSlot.offhand, rarity: Rarity.legendary, defenseBonus: 22, hpBonus: 50, speedBonus: -3, value: 750),
     const Equipment(id: 'grimoire_of_creation', name: 'Grimoire of Creation', slot: EquipmentSlot.offhand, rarity: Rarity.legendary, magicBonus: 20, defenseBonus: 6, value: 750),
