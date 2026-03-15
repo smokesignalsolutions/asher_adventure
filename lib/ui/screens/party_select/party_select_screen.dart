@@ -90,11 +90,15 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
                 SegmentedButton<DifficultyLevel>(
                   selected: {_difficulty},
                   onSelectionChanged: (v) => setState(() => _difficulty = v.first),
-                  segments: const [
-                    ButtonSegment(value: DifficultyLevel.easy, label: Text('Easy')),
-                    ButtonSegment(value: DifficultyLevel.normal, label: Text('Normal')),
-                    ButtonSegment(value: DifficultyLevel.hard, label: Text('Hard')),
-                  ],
+                  segments: DifficultyLevel.values.map((d) {
+                    final profile = ref.read(playerProfileProvider);
+                    final unlocked = profile?.unlockedDifficulties.contains(d) ?? false;
+                    return ButtonSegment(
+                      value: d,
+                      label: Text(d.name[0].toUpperCase() + d.name.substring(1)),
+                      enabled: unlocked,
+                    );
+                  }).toList(),
                 ),
               ],
             ),

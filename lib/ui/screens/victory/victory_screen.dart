@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../models/enums.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../providers/player_profile_provider.dart';
 import '../../../services/legacy_point_calculator.dart';
@@ -47,6 +48,14 @@ class _VictoryScreenState extends ConsumerState<VictoryScreen> {
     // Persist bestiary kills
     if (snapshot.enemyKillCountsThisRun.isNotEmpty) {
       await profileNotifier.recordEnemyKills(snapshot.enemyKillCountsThisRun);
+    }
+
+    // Unlock harder difficulties based on current difficulty
+    if (snapshot.difficulty.index >= DifficultyLevel.normal.index) {
+      await profileNotifier.unlockDifficulty(DifficultyLevel.hard);
+    }
+    if (snapshot.difficulty.index >= DifficultyLevel.hard.index) {
+      await profileNotifier.unlockDifficulty(DifficultyLevel.nightmare);
     }
 
     // Victory = completed all 8 maps, so grant chapter 3 for alive party members

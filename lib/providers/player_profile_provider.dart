@@ -82,6 +82,14 @@ class PlayerProfileNotifier extends StateNotifier<PlayerProfile?> {
     await _save();
   }
 
+  Future<void> unlockDifficulty(DifficultyLevel level) async {
+    if (state == null) return;
+    if (state!.unlockedDifficulties.contains(level)) return;
+    state!.unlockedDifficulties.add(level);
+    state = PlayerProfile.fromJson(state!.toJson());
+    await _save();
+  }
+
   Future<void> recordClassStoryProgress(String className, int chapter) async {
     if (state == null) return;
     final current = state!.classStoryProgress[className] ?? 0;
