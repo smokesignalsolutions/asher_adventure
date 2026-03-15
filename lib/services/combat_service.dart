@@ -142,7 +142,8 @@ class CombatService {
     final sacrificePercent = 0.15 + _random.nextDouble() * 0.10;
     final hpCost = (attacker.totalMaxHp * sacrificePercent).round();
     attacker.currentHp = max(1, attacker.currentHp - hpCost);
-    final damagePerEnemy = (hpCost * 1.5).round();
+    // Scales with HP sacrificed + magic stat, 2.5x multiplier
+    final damagePerEnemy = ((hpCost + attacker.totalMagic) * 2.5).round();
 
     final logs = <String>['${attacker.name} sacrifices $hpCost HP with Dark Pact!'];
     for (final enemy in aliveEnemies) {

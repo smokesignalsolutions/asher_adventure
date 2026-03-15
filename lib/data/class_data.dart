@@ -148,7 +148,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
       Ability(name: 'Eldritch Blast', description: 'Dark energy lashes out.', damage: 12, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Hex', description: 'Curse an enemy, reducing their attack and defense.', damage: 8, refreshChance: 55, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 2, enemyAttackDebuffPercent: 20, enemyDefenseDebuffPercent: 20),
       Ability(name: 'Drain Life', description: 'Steal life from an enemy.', damage: 14, refreshChance: 50, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 5, lifeDrain: true),
-      Ability(name: 'Dark Pact', description: 'Sacrifice 15-25% of your HP to deal 1.5x that as damage to all foes.', damage: 0, refreshChance: 35, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 8, darkPact: true),
+      Ability(name: 'Dark Pact', description: 'Sacrifice 15-25% HP. Deal (sacrifice + magic) x 2.5 to all foes.', damage: 0, refreshChance: 35, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 8, darkPact: true),
       Ability(name: 'Doom', description: 'Mark an enemy for destruction.', damage: 42, refreshChance: 20, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 12),
     ],
   ),
