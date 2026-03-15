@@ -238,7 +238,32 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     final mapNum = state!.currentMapNumber;
     final bossTemplate = bossByMap[mapNum] ?? bossByMap[1]!;
 
-    final enemies = <Enemy>[_enemyFromTemplate(bossTemplate)];
+    // Boss gets double HP
+    final boss = Enemy(
+      id: _uuid.v4(),
+      name: bossTemplate.name,
+      type: bossTemplate.type,
+      currentHp: bossTemplate.hp * 2,
+      maxHp: bossTemplate.hp * 2,
+      attack: bossTemplate.attack,
+      defense: bossTemplate.defense,
+      speed: bossTemplate.speed,
+      magic: bossTemplate.magic,
+      xpReward: bossTemplate.xpReward,
+      goldReward: bossTemplate.goldReward,
+      abilities: bossTemplate.abilities
+          .map((a) => Ability(
+                name: a.name,
+                description: a.description,
+                damage: a.damage,
+                refreshChance: a.refreshChance,
+                targetType: a.targetType,
+                unlockedAtLevel: a.unlockedAtLevel,
+                isBasicAttack: a.isBasicAttack,
+              ))
+          .toList(),
+    );
+    final enemies = <Enemy>[boss];
 
     // Add 2-10 minions from current map's enemy pool
     // (map 1 uses its own enemies since there's no previous map)

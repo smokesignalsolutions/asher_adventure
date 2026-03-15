@@ -64,6 +64,15 @@ class CombatService {
           isAlly: false,
           initiative: rollInitiative(0.0, enemy.speed.toDouble()),
         ));
+        // Bosses act twice per round
+        if (enemy.type == 'boss') {
+          enemyEntries.add(CombatantEntry(
+            id: enemy.id,
+            name: enemy.name,
+            isAlly: false,
+            initiative: rollInitiative(0.0, enemy.speed.toDouble() * 0.5),
+          ));
+        }
       }
     }
 
