@@ -12,6 +12,7 @@ import '../models/enums.dart';
 import '../models/game_state.dart';
 import '../services/map_service.dart';
 import '../services/progression_service.dart';
+import '../models/player_profile.dart';
 import '../services/save_service.dart';
 import '../services/scouting_service.dart';
 
@@ -30,8 +31,10 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
   Future<void> startNewGame(
     List<CharacterClass> selectedClasses,
-    DifficultyLevel difficulty,
-  ) async {
+    DifficultyLevel difficulty, {
+    PlayerProfile? profile,
+    String? activePerk,
+  }) async {
     NameGenerator.reset();
     final party = <Character>[];
 
@@ -67,12 +70,46 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       ));
     }
 
+    // Apply passive bonuses from profile
+    if (profile != null) {
+      final bonuses = profile.passiveBonuses;
+      for (final char in party) {
+        char.maxHp += (bonuses['hp'] ?? 0) * 5;
+        char.currentHp = char.maxHp;
+        char.attack += bonuses['attack'] ?? 0;
+        char.defense += bonuses['defense'] ?? 0;
+        char.speed += bonuses['speed'] ?? 0;
+        char.magic += bonuses['magic'] ?? 0;
+      }
+    }
+
+    // Calculate starting resources
+    int startingGold = 0;
+    int startingPotions = 0;
+    double armyStartColumn = -2.0;
+
+    if (profile != null) {
+      startingPotions += profile.passiveBonuses['health_potion'] ?? 0;
+      armyStartColumn -= (profile.passiveBonuses['army_delay'] ?? 0).toDouble();
+    }
+
+    if (activePerk == 'merchant_purse') startingGold += 50;
+    if (activePerk == 'veteran') {
+      for (final char in party) {
+        ProgressionService.addXp(char, ProgressionService.xpForLevel(2));
+      }
+    }
+
     final map = MapService.generateMap(1);
+    map.armyColumn = armyStartColumn;
 
     state = GameState(
       party: party,
+      gold: startingGold,
+      healthPotions: startingPotions,
       currentMap: map,
       difficulty: difficulty,
+      activePerk: activePerk,
     );
 
     // Scout from starting position

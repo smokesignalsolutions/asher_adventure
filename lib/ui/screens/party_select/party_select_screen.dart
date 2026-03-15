@@ -20,6 +20,7 @@ class PartySelectScreen extends ConsumerStatefulWidget {
 class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
   final _selectedClasses = <CharacterClass>[];
   DifficultyLevel _difficulty = DifficultyLevel.normal;
+  String? _selectedPerk;
 
   List<CharacterClass> get _unlockedClasses {
     final profile = ref.read(playerProfileProvider);
@@ -43,10 +44,13 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
   Future<void> _startGame() async {
     if (_selectedClasses.length != 4) return;
 
+    final profile = ref.read(playerProfileProvider);
     final notifier = ref.read(gameStateProvider.notifier);
     await notifier.startNewGame(
       _selectedClasses,
       _difficulty,
+      profile: profile,
+      activePerk: _selectedPerk,
     );
 
     if (mounted) context.go('/map');
