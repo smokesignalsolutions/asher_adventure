@@ -31,15 +31,14 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
     setState(() {
       if (_selectedClasses.contains(cls)) {
         _selectedClasses.remove(cls);
-      } else {
-        _selectedClasses.clear();
+      } else if (_selectedClasses.length < 4) {
         _selectedClasses.add(cls);
       }
     });
   }
 
   Future<void> _startGame() async {
-    if (_selectedClasses.length != 1) return;
+    if (_selectedClasses.length != 4) return;
 
     final notifier = ref.read(gameStateProvider.notifier);
     await notifier.startNewGame(
@@ -83,7 +82,7 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Select your starting class',
+              'Select 4 heroes for your party',
               style: theme.textTheme.titleMedium,
             ),
           ),
@@ -134,8 +133,8 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
             child: SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _selectedClasses.length == 1 ? _startGame : null,
-                child: const Text('Begin Adventure!'),
+                onPressed: _selectedClasses.length == 4 ? _startGame : null,
+                child: Text('Begin Adventure! (${_selectedClasses.length}/4)'),
               ),
             ),
           ),

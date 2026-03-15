@@ -48,6 +48,9 @@ class Character {
   int magic;
   Map<EquipmentSlot, Equipment?> equipment;
   List<Ability> abilities;
+  double combatAttackMultiplier; // combat-only, resets each fight
+  double combatDefenseMultiplier; // combat-only, resets each fight
+  int combatDefenseBonus; // flat defense bonus from abilities like Holy Guard
 
   Character({
     required this.id,
@@ -63,6 +66,9 @@ class Character {
     required this.magic,
     Map<EquipmentSlot, Equipment?>? equipment,
     List<Ability>? abilities,
+    this.combatAttackMultiplier = 1.0,
+    this.combatDefenseMultiplier = 1.0,
+    this.combatDefenseBonus = 0,
   }) : equipment = equipment ?? {
          for (var slot in EquipmentSlot.values) slot: null,
        },
@@ -71,12 +77,14 @@ class Character {
   bool get isAlive => currentHp > 0;
 
   int get totalAttack =>
-      attack +
-      equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.attackBonus);
+      ((attack +
+      equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.attackBonus)) *
+      combatAttackMultiplier).round();
 
   int get totalDefense =>
-      defense +
-      equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.defenseBonus);
+      ((defense + combatDefenseBonus +
+      equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.defenseBonus)) *
+      combatDefenseMultiplier).round();
 
   int get totalSpeed =>
       speed +

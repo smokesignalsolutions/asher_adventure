@@ -13,6 +13,12 @@ class Enemy {
   final int xpReward;
   final int goldReward;
   final List<Ability> abilities;
+  bool isVulnerable; // takes 5-15% extra damage from all attacks
+  double attackMultiplier; // permanent debuff by Hex etc.
+  double defenseMultiplier; // permanent debuff by Hex etc.
+  double tempAttackMultiplier; // temporary debuff (e.g. Entangle)
+  int tempAttackDebuffTurns; // turns remaining on temp debuff
+  bool isStunned; // skips next turn
 
   Enemy({
     required this.id,
@@ -27,9 +33,18 @@ class Enemy {
     required this.xpReward,
     required this.goldReward,
     required this.abilities,
+    this.isVulnerable = false,
+    this.attackMultiplier = 1.0,
+    this.defenseMultiplier = 1.0,
+    this.tempAttackMultiplier = 1.0,
+    this.tempAttackDebuffTurns = 0,
+    this.isStunned = false,
   });
 
   bool get isAlive => currentHp > 0;
+
+  int get effectiveAttack => (attack * attackMultiplier * tempAttackMultiplier).round();
+  int get effectiveDefense => (defense * defenseMultiplier).round();
 
   Map<String, dynamic> toJson() => {
     'id': id,

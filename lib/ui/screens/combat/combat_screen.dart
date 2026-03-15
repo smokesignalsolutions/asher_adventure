@@ -230,7 +230,13 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     };
 
     String log;
-    if (ability.targetType == AbilityTarget.allEnemies) {
+    if (ability.darkPact) {
+      // Dark Pact: special handling - sacrifice HP, damage all enemies
+      if (!ability.isBasicAttack) ability.isAvailable = false;
+      log = CombatService.executeDarkPact(
+        char, _combat!.enemies.where((e) => e.isAlive).toList(),
+      );
+    } else if (ability.targetType == AbilityTarget.allEnemies) {
       final logs = <String>[];
       for (final enemy in _combat!.enemies.where((e) => e.isAlive)) {
         logs.add(CombatService.executeAllyTurn(char, ability, enemy));
@@ -244,6 +250,15 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       log = logs.join(' ');
     } else {
       log = CombatService.executeAllyTurn(char, ability, target);
+    }
+
+    // Chaotic bounce: 50% chance to hit another random enemy
+    if (ability.chaotic) {
+      final aliveEnemies = _combat!.enemies.where((e) => e.isAlive).toList();
+      if (aliveEnemies.isNotEmpty && Random().nextInt(100) < 50) {
+        final bounceTarget = aliveEnemies[Random().nextInt(aliveEnemies.length)];
+        log += ' ${CombatService.executeChaoticBounce(char, ability, bounceTarget)}';
+      }
     }
 
     // Build attack lines from HP diffs

@@ -225,10 +225,15 @@ class _SlotPickerSheet extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          for (int i = 0; i < slots.length; i++) ...[
-            _buildSlotCard(context, theme, i, slots[i]),
-            if (i < slots.length - 1) const SizedBox(height: 8),
-          ],
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: slots.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) =>
+                  _buildSlotCard(context, theme, i, slots[i]),
+            ),
+          ),
           const SizedBox(height: 8),
         ],
       ),

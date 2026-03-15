@@ -17,6 +17,13 @@ class CombatService {
   }
 
   static CombatState initCombat(List<Character> party, List<Enemy> enemies) {
+    // Reset combat-only buffs
+    for (final char in party) {
+      char.combatAttackMultiplier = 1.0;
+      char.combatDefenseMultiplier = 1.0;
+      char.combatDefenseBonus = 0;
+    }
+
     final turnOrder = buildGroupedTurnOrder(party, enemies);
 
     return CombatState(
@@ -72,13 +79,21 @@ class CombatService {
     }
   }
 
-  static int calculateDamage(int attackStat, int abilityDamage, int targetDefense) {
+  static int calculateDamage(int attackStat, int abilityDamage, int targetDefense, {bool targetVulnerable = false, bool chaotic = false}) {
     // Base damage = attack + ability damage - defense/2
     // Minimum 1 damage
     final raw = attackStat + abilityDamage - (targetDefense ~/ 2);
-    // Add some variance: ±20%
-    final variance = 0.8 + _random.nextDouble() * 0.4;
-    return max(1, (raw * variance).round());
+    // Chaotic: ±25% variance, Normal: ±20% variance
+    final variance = chaotic
+        ? 0.75 + _random.nextDouble() * 0.50
+        : 0.8 + _random.nextDouble() * 0.4;
+    var result = max(1, (raw * variance).round());
+    // Vulnerable enemies take 5-15% extra damage
+    if (targetVulnerable) {
+      final bonus = 1.05 + _random.nextDouble() * 0.10;
+      result = (result * bonus).round();
+    }
+    return result;
   }
 
   static int calculateHealing(int magicStat, int abilityHeal) {
@@ -104,40 +119,143 @@ class CombatService {
     }
   }
 
+  /// Chaotic bounce: hit a random enemy with the same ability
+  static String executeChaoticBounce(Character attacker, Ability ability, Enemy target) {
+    final damage = calculateDamage(
+      attacker.totalAttack, ability.damage, target.effectiveDefense,
+      targetVulnerable: target.isVulnerable, chaotic: true,
+    );
+    target.currentHp = max(0, target.currentHp - damage);
+    var result = 'Chaos Bolt bounces to ${target.name} for $damage damage!';
+    if (!target.isAlive) result += ' ${target.name} is defeated!';
+    return result;
+  }
+
+  /// Dark Pact: sacrifice 15-25% HP, deal 1.5x that to all enemies
+  static String executeDarkPact(Character attacker, List<Enemy> aliveEnemies) {
+    final sacrificePercent = 0.15 + _random.nextDouble() * 0.10;
+    final hpCost = (attacker.totalMaxHp * sacrificePercent).round();
+    attacker.currentHp = max(1, attacker.currentHp - hpCost);
+    final damagePerEnemy = (hpCost * 1.5).round();
+
+    final logs = <String>['${attacker.name} sacrifices $hpCost HP with Dark Pact!'];
+    for (final enemy in aliveEnemies) {
+      enemy.currentHp = max(0, enemy.currentHp - damagePerEnemy);
+      logs.add('${enemy.name} takes $damagePerEnemy damage!');
+      if (!enemy.isAlive) logs.add('${enemy.name} is defeated!');
+    }
+    return logs.join(' ');
+  }
+
   /// Returns a log message describing what happened
   static String executeAllyTurn(
     Character attacker,
     Ability ability,
     dynamic target, // Character or Enemy
   ) {
-    if (ability.damage < 0) {
-      // Healing ability
-      final Character healTarget = target as Character;
-      final healAmount = calculateHealing(attacker.totalMagic, ability.damage);
-      healTarget.currentHp = min(healTarget.totalMaxHp, healTarget.currentHp + healAmount);
-      if (!ability.isBasicAttack) {
-        // Mark ability as used (needs refresh)
-        ability.isAvailable = false;
-      }
-      return '${attacker.name} uses ${ability.name} on ${healTarget.name} for $healAmount healing!';
-    } else {
-      // Damage ability
-      final Enemy enemyTarget = target as Enemy;
-      final damage = calculateDamage(attacker.totalAttack, ability.damage, enemyTarget.defense);
-      enemyTarget.currentHp = max(0, enemyTarget.currentHp - damage);
-      if (!ability.isBasicAttack) {
-        ability.isAvailable = false;
-      }
-      final result = '${attacker.name} uses ${ability.name} on ${enemyTarget.name} for $damage damage!';
-      if (!enemyTarget.isAlive) {
-        return '$result ${enemyTarget.name} is defeated!';
-      }
-      return result;
+    if (!ability.isBasicAttack) {
+      ability.isAvailable = false;
     }
+
+    final logs = <String>[];
+
+    if (ability.damage > 0) {
+      // --- OFFENSIVE: damage + optional debuffs/drain/vulnerability ---
+      final Enemy enemyTarget = target as Enemy;
+      final damage = calculateDamage(
+        attacker.totalAttack, ability.damage, enemyTarget.effectiveDefense,
+        targetVulnerable: enemyTarget.isVulnerable,
+        chaotic: ability.chaotic,
+      );
+      enemyTarget.currentHp = max(0, enemyTarget.currentHp - damage);
+      logs.add('${attacker.name} uses ${ability.name} on ${enemyTarget.name} for $damage damage!');
+
+      if (ability.lifeDrain) {
+        final healAmount = (damage * 0.5).round();
+        attacker.currentHp = min(attacker.totalMaxHp, attacker.currentHp + healAmount);
+        logs.add('Drains $healAmount HP!');
+      }
+      if (ability.appliesVulnerability && !enemyTarget.isVulnerable) {
+        enemyTarget.isVulnerable = true;
+        logs.add('${enemyTarget.name} is weakened!');
+      }
+      if (ability.enemyAttackDebuffPercent > 0) {
+        enemyTarget.attackMultiplier *= (1 - ability.enemyAttackDebuffPercent / 100);
+        logs.add('${enemyTarget.name} attack reduced by ${ability.enemyAttackDebuffPercent}%!');
+      }
+      if (ability.enemyDefenseDebuffPercent > 0) {
+        enemyTarget.defenseMultiplier *= (1 - ability.enemyDefenseDebuffPercent / 100);
+        logs.add('${enemyTarget.name} defense reduced by ${ability.enemyDefenseDebuffPercent}%!');
+      }
+      if (ability.stunChance > 0 && enemyTarget.isAlive && !enemyTarget.isStunned) {
+        if (_random.nextInt(100) < ability.stunChance) {
+          enemyTarget.isStunned = true;
+          logs.add('${enemyTarget.name} is stunned!');
+        }
+      }
+      if (ability.tempEnemyAttackDebuffPercent > 0) {
+        enemyTarget.tempAttackMultiplier = 1 - ability.tempEnemyAttackDebuffPercent / 100;
+        enemyTarget.tempAttackDebuffTurns = ability.debuffDuration;
+        logs.add('${enemyTarget.name} attack reduced by ${ability.tempEnemyAttackDebuffPercent}% for ${ability.debuffDuration} turns!');
+      }
+      if (!enemyTarget.isAlive) {
+        logs.add('${enemyTarget.name} is defeated!');
+      }
+    } else {
+      // --- SUPPORTIVE: heal + optional buffs ---
+      final Character charTarget = target as Character;
+
+      // Heal
+      if (ability.damage < 0) {
+        final healStat = ability.healScalesWithDefense ? attacker.totalDefense : attacker.totalMagic;
+        final healAmount = calculateHealing(healStat, ability.damage);
+        charTarget.currentHp = min(charTarget.totalMaxHp, charTarget.currentHp + healAmount);
+        logs.add('${attacker.name} uses ${ability.name} on ${charTarget.name} for $healAmount healing!');
+      } else if (ability.healPercentMaxHp > 0) {
+        final healAmount = (charTarget.totalMaxHp * ability.healPercentMaxHp / 100).round();
+        charTarget.currentHp = min(charTarget.totalMaxHp, charTarget.currentHp + healAmount);
+        logs.add('${attacker.name} uses ${ability.name}! ${charTarget.name} heals $healAmount HP!');
+      } else {
+        logs.add('${attacker.name} uses ${ability.name}!');
+      }
+
+      // Buffs
+      if (ability.defenseBuffPercent > 0) {
+        charTarget.combatDefenseMultiplier += ability.defenseBuffPercent / 100;
+        logs.add('${charTarget.name} defense +${ability.defenseBuffPercent}%!');
+      }
+      if (ability.attackBuffPercent > 0) {
+        charTarget.combatAttackMultiplier += ability.attackBuffPercent / 100;
+        logs.add('${charTarget.name} attack +${ability.attackBuffPercent}%!');
+      }
+      if (ability.grantCasterDefensePercent > 0) {
+        final bonus = (attacker.totalDefense * ability.grantCasterDefensePercent / 100).round();
+        charTarget.combatDefenseBonus += bonus;
+        logs.add('${charTarget.name} defense +$bonus!');
+      }
+    }
+
+    return logs.join(' ');
   }
 
   /// Enemy AI: pick a random alive ally to attack with basic attack
   static String executeEnemyTurn(Enemy enemy, List<Character> allies) {
+    // Check stun
+    if (enemy.isStunned) {
+      enemy.isStunned = false;
+      return '${enemy.name} is stunned and loses their turn!';
+    }
+
+    // Tick down temporary debuffs
+    final logs = <String>[];
+    if (enemy.tempAttackDebuffTurns > 0) {
+      enemy.tempAttackDebuffTurns--;
+      if (enemy.tempAttackDebuffTurns <= 0) {
+        enemy.tempAttackMultiplier = 1.0;
+        logs.add('${enemy.name}\'s attack returns to normal.');
+      }
+    }
+
     final aliveAllies = allies.where((a) => a.isAlive).toList();
     if (aliveAllies.isEmpty) return '${enemy.name} has no targets.';
 
@@ -150,29 +268,29 @@ class CombatService {
       final healAmount = calculateHealing(enemy.magic, ability.damage);
       enemy.currentHp = min(enemy.maxHp, enemy.currentHp + healAmount);
       if (!ability.isBasicAttack) ability.isAvailable = false;
-      return '${enemy.name} uses ${ability.name} and heals for $healAmount!';
+      logs.add('${enemy.name} uses ${ability.name} and heals for $healAmount!');
+      return logs.join(' ');
     }
 
     if (ability.targetType == AbilityTarget.allEnemies) {
       // Hit all allies
-      final logs = <String>[];
       for (final ally in aliveAllies) {
-        final damage = calculateDamage(enemy.attack, ability.damage, ally.totalDefense);
+        final damage = calculateDamage(enemy.effectiveAttack, ability.damage, ally.totalDefense);
         ally.currentHp = max(0, ally.currentHp - damage);
         logs.add('${ally.name} takes $damage damage');
         if (!ally.isAlive) logs.add('${ally.name} falls!');
       }
       if (!ability.isBasicAttack) ability.isAvailable = false;
-      return '${enemy.name} uses ${ability.name}! ${logs.join('. ')}';
+      return [if (logs.isNotEmpty) ...logs, '${enemy.name} uses ${ability.name}!'].join(' ');
     }
 
     // Single target
     final target = aliveAllies[_random.nextInt(aliveAllies.length)];
-    final damage = calculateDamage(enemy.attack, ability.damage, target.totalDefense);
+    final damage = calculateDamage(enemy.effectiveAttack, ability.damage, target.totalDefense);
     target.currentHp = max(0, target.currentHp - damage);
     if (!ability.isBasicAttack) ability.isAvailable = false;
-    final result = '${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!';
-    if (!target.isAlive) return '$result ${target.name} falls!';
-    return result;
+    logs.add('${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!');
+    if (!target.isAlive) logs.add('${target.name} falls!');
+    return logs.join(' ');
   }
 }
