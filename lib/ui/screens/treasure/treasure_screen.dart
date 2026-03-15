@@ -152,16 +152,28 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
                 ),
                 const SizedBox(height: 16),
                 if (!_equipped)
-                  ...gameState.party.map((char) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: SizedBox(
-                      width: 220,
-                      child: OutlinedButton(
-                        onPressed: () => _equipTo(char),
-                        child: Text('Give to ${char.name.split(' ').first}'),
+                  ...gameState.party.map((char) {
+                    final className = char.characterClass.name[0].toUpperCase() +
+                        char.characterClass.name.substring(1);
+                    final currentItem = char.equipment[_loot!.slot];
+                    final currentLabel = currentItem != null
+                        ? currentItem.name
+                        : 'Empty';
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: SizedBox(
+                        width: 280,
+                        child: OutlinedButton(
+                          onPressed: () => _equipTo(char),
+                          child: Text(
+                            '${char.name.split(' ').first} ($className)\n'
+                            'Current: $currentLabel',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ),
-                    ),
-                  )),
+                    );
+                  }),
               ],
               const SizedBox(height: 24),
               SizedBox(
