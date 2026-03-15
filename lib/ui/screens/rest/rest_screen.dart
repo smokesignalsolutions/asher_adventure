@@ -17,7 +17,8 @@ class RestScreen extends ConsumerWidget {
     }
 
     final theme = Theme.of(context);
-    final healFraction = getMutatorEffect(gameState.activeMutator, 'rest_heal');
+    final mutatorHeal = getMutatorEffect(gameState.activeMutator, 'rest_heal');
+    final healFraction = mutatorHeal < 1.0 ? mutatorHeal : 0.6;
     final isPartialHeal = healFraction < 1.0;
     final healPercent = (healFraction * 100).round();
 
