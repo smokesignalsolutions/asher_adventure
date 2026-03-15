@@ -44,7 +44,7 @@ Example: Normal run, dies on map 4, killed 2 bosses, encountered 8 enemy types =
 ### Run Tracking Fields (in GameState, reset each run)
 - `mapsCompletedThisRun: int` — incremented when boss is defeated and map advances
 - `bossesKilledThisRun: int` — incremented on boss kill
-- `uniqueEnemyTypesKilledThisRun: Set<String>` — enemy template IDs added on kill
+- `uniqueEnemyTypesKilledThisRun: Set<String>` — uses `Enemy.id` as template ID (enemies instantiated from templates share the same ID, e.g. "goblin_grunt")
 - These fields exist only for LP calculation and are discarded with the run save
 
 ## Legacy Hall (Meta-Shop)
@@ -66,7 +66,7 @@ Applied at character creation time in `startNewGame()`, baked into base stats. T
 | +1 defense | 30 | 5 |
 | +1 speed | 40 | 3 |
 | +1 magic | 30 | 5 |
-| +5% shop discount | 20 | 4 |
+| +5% shop discount (reduces purchase prices) | 20 | 4 |
 | +10% ability refresh rate (additive, e.g. 35% becomes 45%) | 50 | 3 |
 | Start with 1 health potion | 15 | 3 |
 | Army starts 1 column further back | 75 | 2 |
@@ -76,7 +76,7 @@ Purchased once, then chosen at the start of each run:
 | Perk | Cost | Effect |
 |------|------|--------|
 | Scavenger | 25 | Start with a random common weapon |
-| Healer's Blessing | 30 | Start with a bonus shield equal to 20% max HP (absorbs damage first, does not exceed max HP cap) |
+| Healer's Blessing | 30 | Start with a bonus shield equal to 20% max HP (requires `shieldHp: int` field on Character; absorbs damage before HP in combat service) |
 | Merchant's Purse | 20 | Start with 50 gold |
 | Scout's Eye | 40 | All adjacent nodes start scouted |
 | Veteran | 60 | Start at level 2 |
@@ -102,7 +102,7 @@ Accessible from the title screen. Three sections:
 - Found at event nodes and treasure nodes (~20% chance)
 - 3-5 pages per map-tier (not per theme), so 12-20 total across 4 tiers
 - Each page is a short paragraph of world-building
-- Collecting all pages for a map → unlocks 1-2 new unique items in that map's equipment pool
+- Collecting all pages for a map-tier → unlocks 1-2 new unique items in that tier's equipment pool
 - Collecting ALL lore → unlocks a secret 9th "true ending" boss fight (stretch goal)
 
 ### Class Stories
@@ -145,7 +145,7 @@ Choice-driven with real tradeoffs:
 - ~15-20 unique events per map theme pool
 
 ### Build-Defining Drops
-Rare legendary items that change playstyle. These require adding a `specialEffect: String?` field to the `Equipment` model to define passive behaviors. Drop source: treasure nodes and boss kills (10% chance to drop a legendary instead of normal loot).
+Rare legendary items that change playstyle. These require adding a `specialEffect: SpecialEffect?` enum field to the `Equipment` model. Known values: `vampiric`, `chainCast`, `thorns`. Drop source: treasure nodes and boss kills (10% chance to drop a legendary instead of normal loot). Combat service checks equipped items for special effects and applies them during damage/healing calculations.
 - "Vampiric Blade" — all attacks heal 25% damage dealt, can't use healing abilities
 - "Staff of Chains" — AOE spells hit twice, single-target spells deal -30%
 - "Shield of Thorns" — reflect 15% damage taken, -20% attack
@@ -190,7 +190,7 @@ PlayerProfile
   totalVictories: int
   furthestMap: int
   unlockedClasses: List<CharacterClass>
-  passiveBonuses: Map<String, int>  // bonus ID → rank
+  passiveBonuses: Map<String, int>  // bonus ID → rank. IDs: "hp", "attack", "defense", "speed", "magic", "shop_discount", "ability_refresh", "health_potion", "army_delay"
   unlockedPerks: List<String>
   bestiary: Map<String, BestiaryEntry>
   lorePages: Map<String, List<bool>>  // map ID → pages found
@@ -246,3 +246,19 @@ The current 3-slot system is simplified: only 1 active run save (since runs rese
 
 ### No New Dependencies
 Built on existing architecture: Riverpod providers, SharedPreferences, GoRouter.
+
+## Suggested Implementation Phases
+
+**Phase 1: Core Loop** — PlayerProfile model, run reset (levels/gear/gold to 0), LP calculation, LP earning on death/victory, Game Over/Victory screens show LP breakdown. This makes the game a roguelike.
+
+**Phase 2: Legacy Hall** — Legacy Hall screen, class unlock purchasing, passive bonus purchasing, starting perk purchasing and per-run selection. This adds the meta-progression spend loop.
+
+**Phase 3: Codex** — Bestiary tracking and rewards, lore page drops and collection, class story chapter tracking and ability unlocks. Codex viewer screen. This adds the discovery layer.
+
+**Phase 4: Run Variety** — Map themes with themed enemies/bosses/events, run mutators, meaningful event system with choices, build-defining legendary drops. This makes each run feel unique.
+
+**Phase 5: Balance & Polish** — Enemy retuning for level-1 starts, difficulty mode gating (Hard/Nightmare unlock), anti-snowball mechanics (gold reset per map, partial rest healing, boss enrage), shield mechanic for Healer's Blessing.
+
+**Phase 6: Content** — Author all 12 theme enemy sets, 60-80 events, 16 class stories (48 chapters), 12-20 lore pages, legendary items. This is the largest phase by volume but mechanically simple.
+
+**Stretch Goals** — Secret 9th boss, unlockable mutators via LP, army unit bestiary entries.
