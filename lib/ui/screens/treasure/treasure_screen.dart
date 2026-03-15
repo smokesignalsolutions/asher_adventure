@@ -2,12 +2,14 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../data/codex_data.dart';
 import '../../../data/equipment_data.dart';
 import '../../../models/character.dart';
 import '../../../models/enums.dart';
 import '../../../models/equipment.dart';
 import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../providers/player_profile_provider.dart';
 import '../../../services/audio_service.dart';
 import '../../widgets/audio_controls.dart';
 
@@ -40,7 +42,50 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
     _goldFound = 10 + random.nextInt(20) * gameState.currentMapNumber;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(audioProvider.notifier).playSfx(SfxType.goldPickup);
+      _checkForLoreDrop();
     });
+  }
+
+  void _checkForLoreDrop() {
+    final random = Random();
+    if (random.nextInt(100) >= 20) return; // 80% chance to skip
+
+    final gameState = ref.read(gameStateProvider);
+    if (gameState == null) return;
+
+    final tier = ((gameState.currentMapNumber - 1) ~/ 2) + 1;
+    final profile = ref.read(playerProfileProvider);
+    if (profile == null) return;
+
+    final available = lorePages
+        .where((p) => p.mapTier == tier && !profile.loreFound.contains(p.id))
+        .toList();
+    if (available.isEmpty) return;
+
+    final page = available[random.nextInt(available.length)];
+    ref.read(playerProfileProvider.notifier).recordLorePageFound(page.id);
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.auto_stories, color: Colors.amber),
+              const SizedBox(width: 8),
+              Expanded(child: Text(page.title)),
+            ],
+          ),
+          content: Text(page.content),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override
