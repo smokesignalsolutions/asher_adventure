@@ -1,0 +1,55 @@
+import '../models/enums.dart';
+import '../models/equipment.dart';
+
+final List<Equipment> legendaryItems = [
+  const Equipment(
+    id: 'legendary_vampiric_blade',
+    name: 'Vampiric Blade',
+    slot: EquipmentSlot.weapon,
+    rarity: Rarity.legendary,
+    attackBonus: 12,
+    value: 200,
+    specialEffect: SpecialEffect.vampiric,
+  ),
+  const Equipment(
+    id: 'legendary_staff_of_chains',
+    name: 'Staff of Chains',
+    slot: EquipmentSlot.weapon,
+    rarity: Rarity.legendary,
+    attackBonus: 5,
+    magicBonus: 15,
+    value: 200,
+    specialEffect: SpecialEffect.chainCast,
+  ),
+  const Equipment(
+    id: 'legendary_shield_of_thorns',
+    name: 'Shield of Thorns',
+    slot: EquipmentSlot.offhand,
+    rarity: Rarity.legendary,
+    defenseBonus: 10,
+    hpBonus: 20,
+    value: 200,
+    specialEffect: SpecialEffect.thorns,
+  ),
+  const Equipment(
+    id: 'legendary_crown_of_insight',
+    name: 'Crown of Insight',
+    slot: EquipmentSlot.helm,
+    rarity: Rarity.legendary,
+    defenseBonus: 5,
+    hpBonus: 30,
+    speedBonus: 2,
+    magicBonus: 8,
+    value: 200,
+  ),
+  const Equipment(
+    id: 'legendary_ring_of_fury',
+    name: 'Ring of Fury',
+    slot: EquipmentSlot.ring,
+    rarity: Rarity.legendary,
+    attackBonus: 8,
+    speedBonus: 3,
+    magicBonus: 5,
+    value: 200,
+  ),
+];

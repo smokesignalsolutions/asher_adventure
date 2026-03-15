@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/codex_data.dart';
 import '../../../data/equipment_data.dart';
+import '../../../data/legendary_data.dart';
 import '../../../models/character.dart';
 import '../../../models/enums.dart';
 import '../../../models/equipment.dart';
@@ -36,10 +37,14 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
     final gameState = ref.read(gameStateProvider);
     if (gameState == null) return;
 
-    final pool = getTreasurePool(gameState.currentMapNumber);
     final random = Random();
 
-    _loot = pool[random.nextInt(pool.length)];
+    if (random.nextInt(100) < 10 && legendaryItems.isNotEmpty) {
+      _loot = legendaryItems[random.nextInt(legendaryItems.length)];
+    } else {
+      final pool = getTreasurePool(gameState.currentMapNumber);
+      _loot = pool[random.nextInt(pool.length)];
+    }
     final treasureGoldMultiplier = getMutatorEffect(gameState.activeMutator, 'treasure_gold');
     _goldFound = ((10 + random.nextInt(20) * gameState.currentMapNumber) * treasureGoldMultiplier).round();
     WidgetsBinding.instance.addPostFrameCallback((_) {
