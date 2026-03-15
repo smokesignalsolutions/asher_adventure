@@ -373,7 +373,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     state = GameState(
       party: state!.party,
-      gold: 0, // Gold resets between maps
+      gold: state!.gold, // Carry gold to next map (earned from boss fight)
       healthPotions: state!.healthPotions,
       currentMapNumber: nextMap,
       currentMap: MapService.generateMap(nextMap),
