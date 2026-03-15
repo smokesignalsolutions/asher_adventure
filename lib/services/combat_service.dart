@@ -197,7 +197,7 @@ class CombatService {
       }
 
       if (ability.lifeDrain) {
-        final healAmount = (damage * 0.5).round();
+        final healAmount = damage;
         attacker.currentHp = min(attacker.totalMaxHp, attacker.currentHp + healAmount);
         logs.add('Drains $healAmount HP!');
       }
