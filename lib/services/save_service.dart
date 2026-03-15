@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/game_state.dart';
+import '../models/player_profile.dart';
 
 class SaveService {
   static const _slotPrefix = 'game_state_slot_';
   static const _achievementsKey = 'achievements';
   static const _settingsKey = 'settings';
   static const slotCount = 3;
+  static const _profileKey = 'player_profile';
+  static const _runSaveKey = 'active_run';
 
   static String _slotKey(int slot) => '$_slotPrefix$slot';
 
@@ -76,5 +79,33 @@ class SaveService {
     final json = prefs.getString(_settingsKey);
     if (json == null) return {};
     return Map<String, dynamic>.from(jsonDecode(json));
+  }
+
+  static Future<void> saveProfile(PlayerProfile profile) async {
+    final prefs = await SharedPreferences.getInstance();
+    final json = jsonEncode(profile.toJson());
+    await prefs.setString(_profileKey, json);
+  }
+
+  static Future<PlayerProfile?> loadProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final json = prefs.getString(_profileKey);
+    if (json == null) return null;
+    return PlayerProfile.fromJson(jsonDecode(json));
+  }
+
+  static Future<void> autoSaveRun(Map<String, dynamic> stateJson) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_runSaveKey, jsonEncode(stateJson));
+  }
+
+  static Future<String?> loadRunSaveJson() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_runSaveKey);
+  }
+
+  static Future<void> deleteRunSave() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_runSaveKey);
   }
 }
