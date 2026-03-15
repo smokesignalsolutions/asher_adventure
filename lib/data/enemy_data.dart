@@ -30,20 +30,20 @@ class EnemyTemplate {
 // Enemies scale per map tier. Each map uses enemies from its tier.
 final Map<int, List<EnemyTemplate>> enemiesByMap = {
   1: [
-    EnemyTemplate(name: 'Goblin', type: 'goblin', hp: 18, attack: 4, defense: 2, speed: 7, magic: 0, xpReward: 20, goldReward: 8,
-      abilities: [Ability(name: 'Scratch', description: 'A clumsy scratch.', damage: 4, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Wolf', type: 'wolf', hp: 22, attack: 5, defense: 1, speed: 9, magic: 0, xpReward: 22, goldReward: 6,
-      abilities: [Ability(name: 'Bite', description: 'A savage bite.', damage: 5, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Bandit', type: 'bandit', hp: 25, attack: 5, defense: 3, speed: 6, magic: 0, xpReward: 25, goldReward: 12,
-      abilities: [Ability(name: 'Slash', description: 'A quick slash.', damage: 5, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Goblin', type: 'goblin', hp: 15, attack: 3, defense: 2, speed: 7, magic: 0, xpReward: 20, goldReward: 8,
+      abilities: [Ability(name: 'Scratch', description: 'A clumsy scratch.', damage: 3, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Wolf', type: 'wolf', hp: 18, attack: 4, defense: 1, speed: 9, magic: 0, xpReward: 22, goldReward: 6,
+      abilities: [Ability(name: 'Bite', description: 'A savage bite.', damage: 4, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Bandit', type: 'bandit', hp: 20, attack: 4, defense: 3, speed: 6, magic: 0, xpReward: 25, goldReward: 12,
+      abilities: [Ability(name: 'Slash', description: 'A quick slash.', damage: 4, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
   ],
   2: [
-    EnemyTemplate(name: 'Skeleton', type: 'skeleton', hp: 30, attack: 6, defense: 4, speed: 6, magic: 1, xpReward: 30, goldReward: 10,
-      abilities: [Ability(name: 'Bone Club', description: 'Whack with a bone.', damage: 6, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Orc Grunt', type: 'orc', hp: 38, attack: 8, defense: 5, speed: 5, magic: 0, xpReward: 35, goldReward: 14,
-      abilities: [Ability(name: 'Smash', description: 'A brutal smash.', damage: 8, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Giant Spider', type: 'spider', hp: 28, attack: 7, defense: 3, speed: 8, magic: 0, xpReward: 32, goldReward: 10,
-      abilities: [Ability(name: 'Venomous Bite', description: 'A poisonous bite.', damage: 7, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Skeleton', type: 'skeleton', hp: 25, attack: 5, defense: 4, speed: 6, magic: 1, xpReward: 30, goldReward: 10,
+      abilities: [Ability(name: 'Bone Club', description: 'Whack with a bone.', damage: 5, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Orc Grunt', type: 'orc', hp: 32, attack: 7, defense: 5, speed: 5, magic: 0, xpReward: 35, goldReward: 14,
+      abilities: [Ability(name: 'Smash', description: 'A brutal smash.', damage: 7, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Giant Spider', type: 'spider', hp: 24, attack: 6, defense: 3, speed: 8, magic: 0, xpReward: 32, goldReward: 10,
+      abilities: [Ability(name: 'Venomous Bite', description: 'A poisonous bite.', damage: 6, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
   ],
   3: [
     EnemyTemplate(name: 'Dark Mage', type: 'dark_mage', hp: 42, attack: 5, defense: 4, speed: 8, magic: 10, xpReward: 40, goldReward: 18,
@@ -97,12 +97,12 @@ final Map<int, List<EnemyTemplate>> enemiesByMap = {
 
 // Boss for each map
 final Map<int, EnemyTemplate> bossByMap = {
-  1: EnemyTemplate(name: 'Goblin King', type: 'boss', hp: 55, attack: 7, defense: 4, speed: 7, magic: 2, xpReward: 80, goldReward: 50,
+  1: EnemyTemplate(name: 'Goblin King', type: 'boss', hp: 45, attack: 7, defense: 4, speed: 7, magic: 2, xpReward: 80, goldReward: 50,
     abilities: [
       Ability(name: 'Royal Slash', description: 'The king strikes!', damage: 7, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Call Minions', description: 'Summon goblins to help.', damage: 4, refreshChance: 50, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 1),
     ]),
-  2: EnemyTemplate(name: 'Bone Lord', type: 'boss', hp: 90, attack: 10, defense: 7, speed: 5, magic: 6, xpReward: 120, goldReward: 80,
+  2: EnemyTemplate(name: 'Bone Lord', type: 'boss', hp: 80, attack: 10, defense: 7, speed: 5, magic: 6, xpReward: 120, goldReward: 80,
     abilities: [
       Ability(name: 'Bone Crush', description: 'Crushing bones!', damage: 10, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
       Ability(name: 'Summon Skeletons', description: 'Raise the dead.', damage: 6, refreshChance: 45, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 1),
