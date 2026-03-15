@@ -410,7 +410,18 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
 
   void _handleKeyPress(KeyEvent event) {
     if (event is! KeyDownEvent) return;
-    if (!_waitingForInput || _combat == null || _combat!.isComplete) return;
+    if (_combat == null) return;
+
+    // Spacebar or C to continue after combat ends
+    if (_combat!.isComplete) {
+      if (event.logicalKey == LogicalKeyboardKey.space ||
+          event.logicalKey == LogicalKeyboardKey.keyC) {
+        _onCombatEnd();
+      }
+      return;
+    }
+
+    if (!_waitingForInput) return;
 
     final current = _combat!.currentCombatant;
     final char = _combat!.allies.firstWhere((c) => c.id == current.id);
