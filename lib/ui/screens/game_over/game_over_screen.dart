@@ -52,6 +52,17 @@ class _GameOverScreenState extends ConsumerState<GameOverScreen> {
       await profileNotifier.recordEnemyKills(snapshot.enemyKillCountsThisRun);
     }
 
+    // Step 4b: Check class story progress for alive party members
+    for (final char in snapshot.party.where((c) => c.isAlive)) {
+      final className = char.characterClass.name;
+      final maps = snapshot.mapsCompletedThisRun;
+      if (maps >= 5) {
+        await profileNotifier.recordClassStoryProgress(className, 2);
+      } else if (maps >= 2) {
+        await profileNotifier.recordClassStoryProgress(className, 1);
+      }
+    }
+
     // Step 5: Delete run save
     await gameNotifier.gameOver();
 

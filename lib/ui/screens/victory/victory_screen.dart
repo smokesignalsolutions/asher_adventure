@@ -49,6 +49,11 @@ class _VictoryScreenState extends ConsumerState<VictoryScreen> {
       await profileNotifier.recordEnemyKills(snapshot.enemyKillCountsThisRun);
     }
 
+    // Victory = completed all 8 maps, so grant chapter 3 for alive party members
+    for (final char in snapshot.party.where((c) => c.isAlive)) {
+      await profileNotifier.recordClassStoryProgress(char.characterClass.name, 3);
+    }
+
     await gameNotifier.gameOver();
 
     if (mounted) {
