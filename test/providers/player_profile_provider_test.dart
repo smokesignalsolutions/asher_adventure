@@ -2,8 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:asher_adventure/providers/player_profile_provider.dart';
-import 'package:asher_adventure/models/player_profile.dart';
-import 'package:asher_adventure/models/enums.dart';
 
 void main() {
   setUp(() {
