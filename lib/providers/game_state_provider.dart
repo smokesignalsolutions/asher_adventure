@@ -132,6 +132,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     uniqueEnemyTypesKilledThisRun: Set.from(state!.uniqueEnemyTypesKilledThisRun),
     enemyKillCountsThisRun: Map.from(state!.enemyKillCountsThisRun),
     activePerk: state!.activePerk,
+    activeMutator: state!.activeMutator,
   );
 
   Future<void> moveToNode(String nodeId) async {
@@ -355,6 +356,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       uniqueEnemyTypesKilledThisRun: state!.uniqueEnemyTypesKilledThisRun,
       enemyKillCountsThisRun: state!.enemyKillCountsThisRun,
       activePerk: state!.activePerk,
+      activeMutator: state!.activeMutator,
     );
 
     ScoutingService.scoutAdjacentNodes(state!.currentMap, state!.party);
