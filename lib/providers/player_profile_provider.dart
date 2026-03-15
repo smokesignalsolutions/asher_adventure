@@ -65,6 +65,32 @@ class PlayerProfileNotifier extends StateNotifier<PlayerProfile?> {
     return true;
   }
 
+  Future<void> recordEnemyKills(Map<String, int> killCounts) async {
+    if (state == null) return;
+    for (final entry in killCounts.entries) {
+      state!.bestiaryKills[entry.key] = (state!.bestiaryKills[entry.key] ?? 0) + entry.value;
+    }
+    state = PlayerProfile.fromJson(state!.toJson());
+    await _save();
+  }
+
+  Future<void> recordLorePageFound(String pageId) async {
+    if (state == null) return;
+    if (state!.loreFound.contains(pageId)) return;
+    state!.loreFound.add(pageId);
+    state = PlayerProfile.fromJson(state!.toJson());
+    await _save();
+  }
+
+  Future<void> recordClassStoryProgress(String className, int chapter) async {
+    if (state == null) return;
+    final current = state!.classStoryProgress[className] ?? 0;
+    if (chapter <= current) return;
+    state!.classStoryProgress[className] = chapter;
+    state = PlayerProfile.fromJson(state!.toJson());
+    await _save();
+  }
+
   Future<void> _save() async {
     if (state != null) {
       await SaveService.saveProfile(state!);

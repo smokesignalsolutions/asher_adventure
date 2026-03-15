@@ -137,6 +137,48 @@ void main() {
       expect(success, false);
     });
 
+    test('recordEnemyKills accumulates kills', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(playerProfileProvider.notifier);
+      await notifier.initialize();
+
+      await notifier.recordEnemyKills({'goblin': 5, 'wolf': 2});
+      await notifier.recordEnemyKills({'goblin': 3});
+      final profile = container.read(playerProfileProvider);
+
+      expect(profile!.bestiaryKills['goblin'], 8);
+      expect(profile.bestiaryKills['wolf'], 2);
+    });
+
+    test('recordLorePageFound adds page', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(playerProfileProvider.notifier);
+      await notifier.initialize();
+
+      await notifier.recordLorePageFound('lore_1_1');
+      await notifier.recordLorePageFound('lore_1_1'); // duplicate ignored
+      final profile = container.read(playerProfileProvider);
+
+      expect(profile!.loreFound, contains('lore_1_1'));
+      expect(profile.loreFound.length, 1);
+    });
+
+    test('recordClassStoryProgress updates highest chapter', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(playerProfileProvider.notifier);
+      await notifier.initialize();
+
+      await notifier.recordClassStoryProgress('fighter', 1);
+      await notifier.recordClassStoryProgress('fighter', 2);
+      await notifier.recordClassStoryProgress('fighter', 1); // lower ignored
+      final profile = container.read(playerProfileProvider);
+
+      expect(profile!.classStoryProgress['fighter'], 2);
+    });
+
     test('purchasePerk unlocks perk', () async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
