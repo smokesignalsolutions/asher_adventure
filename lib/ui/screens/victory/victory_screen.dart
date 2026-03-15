@@ -17,14 +17,18 @@ class VictoryScreen extends ConsumerStatefulWidget {
 
 class _VictoryScreenState extends ConsumerState<VictoryScreen> {
   LegacyPointResult? _lpResult;
+  bool _processing = false;
 
   @override
   void initState() {
     super.initState();
-    _processRunEnd();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _processRunEnd());
   }
 
   Future<void> _processRunEnd() async {
+    if (_processing) return;
+    _processing = true;
+
     final gameNotifier = ref.read(gameStateProvider.notifier);
     final profileNotifier = ref.read(playerProfileProvider.notifier);
 
