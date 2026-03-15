@@ -339,15 +339,33 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       final totalGold =
           _combat!.enemies.fold(0, (sum, e) => sum + e.goldReward);
       final notifier = ref.read(gameStateProvider.notifier);
-      notifier.completeCombat(totalXp, totalGold);
+
+      // Determine if this was a boss fight
+      final gameState = ref.read(gameStateProvider);
+      final isBoss = gameState != null &&
+          gameState.currentMap.currentNode.type == NodeType.boss;
+
+      // Track killed enemy types for LP calculation
+      notifier.completeCombat(
+        totalXp,
+        totalGold,
+        killedEnemyTypes: _combat!.enemies
+            .where((e) => !e.isAlive)
+            .map((e) => e.type)
+            .toSet()
+            .toList(),
+        bossKilled: isBoss,
+      );
+
       if (_isArmyFight) {
         notifier.defeatArmy();
       }
 
-      final gameState = ref.read(gameStateProvider);
-      if (gameState != null &&
-          gameState.currentMap.currentNode.type == NodeType.boss) {
-        if (gameState.currentMapNumber >= 8) {
+      // Re-read state after completeCombat updates it
+      final updatedState = ref.read(gameStateProvider);
+      if (isBoss) {
+        if (updatedState != null && updatedState.currentMapNumber >= 8) {
+          // Victory screen handles LP calculation and save cleanup
           context.go('/victory');
         } else {
           ref.read(gameStateProvider.notifier).advanceToNextMap();
@@ -357,7 +375,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         context.go('/map');
       }
     } else {
-      ref.read(gameStateProvider.notifier).gameOver();
+      // DO NOT call gameOver() here — Game Over screen handles
+      // the run-end lifecycle (LP calc -> profile update -> save delete)
       context.go('/game-over');
     }
   }
