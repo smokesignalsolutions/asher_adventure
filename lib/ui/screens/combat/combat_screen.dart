@@ -1032,14 +1032,40 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: bgColor,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.lerp(bgColor, Colors.white, 0.15)!,
+                bgColor,
+                Color.lerp(bgColor, Colors.black, 0.15)!,
+              ],
+              stops: const [0.0, 0.4, 1.0],
+            ),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isSelected
                   ? (selectedColor ?? theme.colorScheme.primary)
-                  : theme.colorScheme.outline.withValues(alpha: 0.3),
-              width: isSelected ? 3 : 1,
+                  : theme.colorScheme.outline.withValues(alpha: 0.5),
+              width: isSelected ? 3 : 1.5,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: (isSelected
+                    ? (selectedColor ?? theme.colorScheme.primary)
+                    : Colors.black)
+                    .withValues(alpha: 0.4),
+                blurRadius: isSelected ? 8 : 4,
+                offset: const Offset(0, 3),
+              ),
+              if (isSelected)
+                BoxShadow(
+                  color: (selectedColor ?? theme.colorScheme.primary)
+                      .withValues(alpha: 0.2),
+                  blurRadius: 12,
+                  spreadRadius: 1,
+                ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
