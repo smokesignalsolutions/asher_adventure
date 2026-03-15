@@ -9,12 +9,11 @@ import '../models/enums.dart';
 class CombatService {
   static final _random = Random();
 
-  static double rollInitiative(double speedModifier) {
-    // Roll 1.00 to 20.00 + modifier
+  static double rollInitiative(double classModifier, double speed) {
+    // Roll 1.00 to 20.00 + class modifier + speed/4
     final roll = (_random.nextDouble() * 19.0 + 1.0);
-    // Round to 2 decimal places
     final rounded = (roll * 100).roundToDouble() / 100;
-    return rounded + speedModifier;
+    return rounded + classModifier + speed / 4;
   }
 
   static CombatState initCombat(List<Character> party, List<Enemy> enemies) {
@@ -49,7 +48,10 @@ class CombatService {
           id: char.id,
           name: char.name,
           isAlly: true,
-          initiative: rollInitiative(char.totalSpeed.toDouble()),
+          initiative: rollInitiative(
+            classDefinitions[char.characterClass]?.initiativeModifier ?? 0.0,
+            char.totalSpeed.toDouble(),
+          ),
         ));
       }
     }
@@ -60,7 +62,7 @@ class CombatService {
           id: enemy.id,
           name: enemy.name,
           isAlly: false,
-          initiative: rollInitiative(enemy.speed.toDouble()),
+          initiative: rollInitiative(0.0, enemy.speed.toDouble()),
         ));
       }
     }
