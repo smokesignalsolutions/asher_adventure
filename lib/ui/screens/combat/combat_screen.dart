@@ -56,6 +56,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
   // Army fight flag
   bool _isArmyFight = false;
 
+  // Boss fight flag
+  bool _isBossFight = false;
+
   // Mutator multipliers
   double _enemyDamageMultiplier = 1.0;
   double _healingMultiplier = 1.0;
@@ -90,6 +93,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     final currentNode = gameState.currentMap.currentNode;
     final List<Enemy> enemies;
     _isArmyFight = notifier.isArmyCatching;
+    _isBossFight = currentNode.type == NodeType.boss;
     if (_isArmyFight) {
       enemies = notifier.generateArmyEnemies();
       ref.read(audioProvider.notifier).playMusic(MusicTrack.bossBattle);
@@ -202,6 +206,14 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       _combat!.currentTurnIndex = 0;
       _combat!.roundNumber++;
       _combat!.combatLog.add('--- Round ${_combat!.roundNumber} ---');
+
+      // Boss enrage: after round 15, enemies get +10% attack per round
+      if (_isBossFight && _combat!.roundNumber > 15) {
+        for (final enemy in _combat!.enemies.where((e) => e.isAlive)) {
+          enemy.attackMultiplier = (enemy.attackMultiplier * 1.10);
+        }
+        _combat!.combatLog.add('The enemy grows stronger! (Enrage!)');
+      }
 
       for (final ally in _combat!.allies) {
         CombatService.refreshAbilities(ally.abilities);
