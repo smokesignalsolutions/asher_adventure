@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/class_data.dart';
+import '../../../data/legacy_data.dart';
 import '../../../models/enums.dart';
 import '../../../models/player_profile.dart';
 import '../../../providers/audio_provider.dart';
@@ -21,6 +22,14 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
   final _selectedClasses = <CharacterClass>[];
   DifficultyLevel _difficulty = DifficultyLevel.normal;
   String? _selectedPerk;
+
+  List<StartingPerkDefinition> get _availablePerks {
+    final profile = ref.read(playerProfileProvider);
+    if (profile == null) return [];
+    return startingPerks
+        .where((p) => profile.unlockedPerks.contains(p.id))
+        .toList();
+  }
 
   List<CharacterClass> get _unlockedClasses {
     final profile = ref.read(playerProfileProvider);
@@ -85,6 +94,40 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
               ],
             ),
           ),
+          // Perk selection (only if perks unlocked)
+          if (_availablePerks.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Starting Perk',
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  // "None" option
+                  ChoiceChip(
+                    label: const Text('None'),
+                    selected: _selectedPerk == null,
+                    onSelected: (_) => setState(() => _selectedPerk = null),
+                  ),
+                  // Unlocked perks
+                  ..._availablePerks.map((perk) => ChoiceChip(
+                    label: Text(perk.name),
+                    selected: _selectedPerk == perk.id,
+                    onSelected: (_) => setState(() => _selectedPerk = perk.id),
+                    tooltip: perk.description,
+                  )),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
