@@ -101,6 +101,11 @@ class GameStateNotifier extends StateNotifier<GameState?> {
         ProgressionService.addXp(char, ProgressionService.xpForLevel(2));
       }
     }
+    if (activePerk == 'healer_blessing') {
+      for (final char in party) {
+        char.shieldHp = (char.totalMaxHp * 0.20).round();
+      }
+    }
 
     final map = MapService.generateMap(1);
     map.armyColumn = armyStartColumn;

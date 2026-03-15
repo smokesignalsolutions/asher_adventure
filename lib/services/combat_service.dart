@@ -296,9 +296,17 @@ class CombatService {
     if (ability.targetType == AbilityTarget.allEnemies) {
       // Hit all allies
       for (final ally in aliveAllies) {
-        final damage = calculateDamage(enemy.effectiveAttack, ability.damage, ally.totalDefense, damageMultiplier: enemyDamageMultiplier);
+        var damage = calculateDamage(enemy.effectiveAttack, ability.damage, ally.totalDefense, damageMultiplier: enemyDamageMultiplier);
+        var log = '${ally.name} takes $damage damage';
+        // Shield absorbs damage first
+        if (ally.shieldHp > 0) {
+          final shieldAbsorb = min(damage, ally.shieldHp);
+          ally.shieldHp -= shieldAbsorb;
+          damage -= shieldAbsorb;
+          if (shieldAbsorb > 0) log += ' (Shield -$shieldAbsorb)';
+        }
         ally.currentHp = max(0, ally.currentHp - damage);
-        logs.add('${ally.name} takes $damage damage');
+        logs.add(log);
 
         // Thorns: reflect 15% damage back
         final allyOffhand = ally.equipment[EquipmentSlot.offhand];
@@ -318,10 +326,18 @@ class CombatService {
 
     // Single target
     final target = aliveAllies[_random.nextInt(aliveAllies.length)];
-    final damage = calculateDamage(enemy.effectiveAttack, ability.damage, target.totalDefense, damageMultiplier: enemyDamageMultiplier);
-    target.currentHp = max(0, target.currentHp - damage);
+    var damage = calculateDamage(enemy.effectiveAttack, ability.damage, target.totalDefense, damageMultiplier: enemyDamageMultiplier);
     if (!ability.isBasicAttack) ability.isAvailable = false;
-    logs.add('${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!');
+    var log = '${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!';
+    // Shield absorbs damage first
+    if (target.shieldHp > 0) {
+      final shieldAbsorb = min(damage, target.shieldHp);
+      target.shieldHp -= shieldAbsorb;
+      damage -= shieldAbsorb;
+      if (shieldAbsorb > 0) log += ' (Shield -$shieldAbsorb)';
+    }
+    target.currentHp = max(0, target.currentHp - damage);
+    logs.add(log);
 
     // Thorns: reflect 15% damage back
     final offhand = target.equipment[EquipmentSlot.offhand];

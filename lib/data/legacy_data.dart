@@ -49,4 +49,5 @@ const List<StartingPerkDefinition> startingPerks = [
   StartingPerkDefinition(id: 'veteran', name: 'Veteran', description: 'Start at level 2', cost: 60),
   StartingPerkDefinition(id: 'lucky', name: 'Lucky', description: '+10% treasure quality', cost: 45),
   StartingPerkDefinition(id: 'army_intel', name: 'Army Intel', description: 'Army moves 20% slower on map 1', cost: 35),
+  StartingPerkDefinition(id: 'healer_blessing', name: "Healer's Blessing", description: 'Start with a shield equal to 20% max HP (absorbs damage first)', cost: 30),
 ];

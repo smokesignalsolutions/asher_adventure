@@ -48,6 +48,7 @@ class Character {
   int magic;
   Map<EquipmentSlot, Equipment?> equipment;
   List<Ability> abilities;
+  int shieldHp;
   double combatAttackMultiplier; // combat-only, resets each fight
   double combatDefenseMultiplier; // combat-only, resets each fight
   int combatDefenseBonus; // flat defense bonus from abilities like Holy Guard
@@ -66,6 +67,7 @@ class Character {
     required this.magic,
     Map<EquipmentSlot, Equipment?>? equipment,
     List<Ability>? abilities,
+    this.shieldHp = 0,
     this.combatAttackMultiplier = 1.0,
     this.combatDefenseMultiplier = 1.0,
     this.combatDefenseBonus = 0,
@@ -114,6 +116,7 @@ class Character {
       for (var entry in equipment.entries)
         entry.key.name: entry.value?.toJson(),
     },
+    'shieldHp': shieldHp,
     'abilities': abilities.map((a) => a.toJson()).toList(),
   };
 
@@ -137,6 +140,7 @@ class Character {
       defense: json['defense'],
       speed: json['speed'],
       magic: json['magic'],
+      shieldHp: json['shieldHp'] ?? 0,
       equipment: equipMap,
       abilities: (json['abilities'] as List)
           .map((a) => Ability.fromJson(a))
