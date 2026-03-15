@@ -26,3 +26,5 @@ enum Rarity { common, uncommon, rare, epic, legendary }
 enum DifficultyLevel { easy, normal, hard, nightmare }
 
 enum AbilityTarget { singleEnemy, allEnemies, singleAlly, allAllies, self }
+
+enum SpecialEffect { vampiric, chainCast, thorns }

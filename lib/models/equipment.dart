@@ -11,6 +11,7 @@ class Equipment {
   final int speedBonus;
   final int magicBonus;
   final int value; // gold value
+  final SpecialEffect? specialEffect;
 
   const Equipment({
     required this.id,
@@ -23,6 +24,7 @@ class Equipment {
     this.speedBonus = 0,
     this.magicBonus = 0,
     required this.value,
+    this.specialEffect,
   });
 
   Map<String, dynamic> toJson() => {
@@ -36,6 +38,7 @@ class Equipment {
     'speedBonus': speedBonus,
     'magicBonus': magicBonus,
     'value': value,
+    'specialEffect': specialEffect?.index,
   };
 
   factory Equipment.fromJson(Map<String, dynamic> json) => Equipment(
@@ -49,5 +52,8 @@ class Equipment {
     speedBonus: json['speedBonus'] ?? 0,
     magicBonus: json['magicBonus'] ?? 0,
     value: json['value'],
+    specialEffect: json['specialEffect'] != null
+        ? SpecialEffect.values[json['specialEffect']]
+        : null,
   );
 }
