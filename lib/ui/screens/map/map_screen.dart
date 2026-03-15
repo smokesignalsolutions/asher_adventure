@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../data/map_backgrounds.dart';
 import '../../../models/enums.dart';
 import '../../../models/map_node.dart';
 import '../../../providers/game_state_provider.dart';
@@ -129,10 +130,28 @@ class MapScreen extends ConsumerWidget {
                 final currentNode = map.currentNode;
                 const nodeRadius = 22.0;
 
+                final bgPath = mapBackground(gameState.currentMapNumber);
+
                 return ClipRect(
                   child: Stack(
                     children: [
-                      // Background, connections, army wave
+                      // Background image
+                      Positioned.fill(
+                        child: Image.asset(
+                          bgPath,
+                          fit: BoxFit.cover,
+                          filterQuality: FilterQuality.none,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(color: const Color(0xFF1A2A1A)),
+                        ),
+                      ),
+                      // Dim overlay for readability
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.black.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      // Connections, army wave overlay
                       Positioned.fill(
                         child: CustomPaint(
                           painter: _MapPainter(
@@ -309,27 +328,8 @@ class _MapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    _drawBackground(canvas, size);
     _drawArmy(canvas, size);
     _drawConnections(canvas, size);
-  }
-
-  // -- Background -----------------------------------------------------------
-  void _drawBackground(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF1A2A1A),
-            Color(0xFF0D1A0D),
-            Color(0xFF1A1A0D),
-          ],
-        ).createShader(rect),
-    );
   }
 
   // -- Army wave ------------------------------------------------------------

@@ -20,14 +20,20 @@ final _random = Random();
 class GameStateNotifier extends StateNotifier<GameState?> {
   GameStateNotifier() : super(null);
 
-  Future<void> loadGame() async {
-    state = await SaveService.loadSave();
+  int _activeSlot = 0;
+  int get activeSlot => _activeSlot;
+
+  Future<void> loadGame([int slot = 0]) async {
+    _activeSlot = slot;
+    state = await SaveService.loadSave(slot);
   }
 
   Future<void> startNewGame(
     List<CharacterClass> selectedClasses,
-    DifficultyLevel difficulty,
-  ) async {
+    DifficultyLevel difficulty, {
+    int slot = 0,
+  }) async {
+    _activeSlot = slot;
     NameGenerator.reset();
     final party = <Character>[];
 
@@ -132,7 +138,10 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     if (state == null) return [];
     final mapNum = state!.currentMapNumber;
     final templates = enemiesByMap[mapNum] ?? enemiesByMap[1]!;
-    final count = 1 + _random.nextInt(3); // 1-3 enemies
+    // Scale enemy count with party size: solo=1, 2 party=1-2, 3+=1-3
+    final partySize = state!.party.where((c) => c.isAlive).length;
+    final maxEnemies = partySize <= 1 ? 1 : partySize <= 2 ? 2 : 3;
+    final count = 1 + _random.nextInt(maxEnemies); // 1 to maxEnemies
 
     return List.generate(count, (_) {
       final template = templates[_random.nextInt(templates.length)];
@@ -366,13 +375,13 @@ class GameStateNotifier extends StateNotifier<GameState?> {
   }
 
   Future<void> gameOver() async {
-    await SaveService.deleteSave();
+    await SaveService.deleteSave(_activeSlot);
     state = null;
   }
 
   Future<void> _autoSave() async {
     if (state != null) {
-      await SaveService.autoSave(state!);
+      await SaveService.autoSave(state!, _activeSlot);
     }
   }
 }

@@ -30,28 +30,28 @@ class EnemyTemplate {
 // Enemies scale per map tier. Each map uses enemies from its tier.
 final Map<int, List<EnemyTemplate>> enemiesByMap = {
   1: [
-    EnemyTemplate(name: 'Goblin', type: 'goblin', hp: 30, attack: 6, defense: 3, speed: 8, magic: 0, xpReward: 15, goldReward: 5,
-      abilities: [Ability(name: 'Scratch', description: 'A clumsy scratch.', damage: 6, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Wolf', type: 'wolf', hp: 35, attack: 8, defense: 2, speed: 10, magic: 0, xpReward: 18, goldReward: 3,
-      abilities: [Ability(name: 'Bite', description: 'A savage bite.', damage: 8, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Bandit', type: 'bandit', hp: 40, attack: 7, defense: 5, speed: 7, magic: 0, xpReward: 20, goldReward: 10,
-      abilities: [Ability(name: 'Slash', description: 'A quick slash.', damage: 7, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Goblin', type: 'goblin', hp: 18, attack: 4, defense: 2, speed: 7, magic: 0, xpReward: 20, goldReward: 8,
+      abilities: [Ability(name: 'Scratch', description: 'A clumsy scratch.', damage: 4, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Wolf', type: 'wolf', hp: 22, attack: 5, defense: 1, speed: 9, magic: 0, xpReward: 22, goldReward: 6,
+      abilities: [Ability(name: 'Bite', description: 'A savage bite.', damage: 5, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Bandit', type: 'bandit', hp: 25, attack: 5, defense: 3, speed: 6, magic: 0, xpReward: 25, goldReward: 12,
+      abilities: [Ability(name: 'Slash', description: 'A quick slash.', damage: 5, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
   ],
   2: [
-    EnemyTemplate(name: 'Skeleton', type: 'skeleton', hp: 45, attack: 9, defense: 6, speed: 6, magic: 2, xpReward: 25, goldReward: 8,
-      abilities: [Ability(name: 'Bone Club', description: 'Whack with a bone.', damage: 9, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Orc Grunt', type: 'orc', hp: 55, attack: 11, defense: 7, speed: 5, magic: 0, xpReward: 30, goldReward: 12,
-      abilities: [Ability(name: 'Smash', description: 'A brutal smash.', damage: 11, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Giant Spider', type: 'spider', hp: 40, attack: 10, defense: 4, speed: 9, magic: 0, xpReward: 28, goldReward: 7,
-      abilities: [Ability(name: 'Venomous Bite', description: 'A poisonous bite.', damage: 10, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Skeleton', type: 'skeleton', hp: 30, attack: 6, defense: 4, speed: 6, magic: 1, xpReward: 30, goldReward: 10,
+      abilities: [Ability(name: 'Bone Club', description: 'Whack with a bone.', damage: 6, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Orc Grunt', type: 'orc', hp: 38, attack: 8, defense: 5, speed: 5, magic: 0, xpReward: 35, goldReward: 14,
+      abilities: [Ability(name: 'Smash', description: 'A brutal smash.', damage: 8, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Giant Spider', type: 'spider', hp: 28, attack: 7, defense: 3, speed: 8, magic: 0, xpReward: 32, goldReward: 10,
+      abilities: [Ability(name: 'Venomous Bite', description: 'A poisonous bite.', damage: 7, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
   ],
   3: [
-    EnemyTemplate(name: 'Dark Mage', type: 'dark_mage', hp: 50, attack: 5, defense: 5, speed: 8, magic: 14, xpReward: 40, goldReward: 18,
-      abilities: [Ability(name: 'Shadow Bolt', description: 'Dark magic strikes.', damage: 14, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Ogre', type: 'ogre', hp: 80, attack: 14, defense: 8, speed: 3, magic: 0, xpReward: 45, goldReward: 20,
-      abilities: [Ability(name: 'Club Slam', description: 'A massive club attack.', damage: 14, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
-    EnemyTemplate(name: 'Harpy', type: 'harpy', hp: 45, attack: 12, defense: 5, speed: 12, magic: 6, xpReward: 38, goldReward: 15,
-      abilities: [Ability(name: 'Talon Strike', description: 'Razor talons slash.', damage: 12, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Dark Mage', type: 'dark_mage', hp: 42, attack: 5, defense: 4, speed: 8, magic: 10, xpReward: 40, goldReward: 18,
+      abilities: [Ability(name: 'Shadow Bolt', description: 'Dark magic strikes.', damage: 10, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Ogre', type: 'ogre', hp: 65, attack: 11, defense: 7, speed: 3, magic: 0, xpReward: 45, goldReward: 20,
+      abilities: [Ability(name: 'Club Slam', description: 'A massive club attack.', damage: 11, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
+    EnemyTemplate(name: 'Harpy', type: 'harpy', hp: 38, attack: 9, defense: 4, speed: 11, magic: 4, xpReward: 38, goldReward: 15,
+      abilities: [Ability(name: 'Talon Strike', description: 'Razor talons slash.', damage: 9, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true)]),
   ],
   4: [
     EnemyTemplate(name: 'Troll', type: 'troll', hp: 100, attack: 16, defense: 10, speed: 4, magic: 0, xpReward: 55, goldReward: 25,
@@ -97,20 +97,20 @@ final Map<int, List<EnemyTemplate>> enemiesByMap = {
 
 // Boss for each map
 final Map<int, EnemyTemplate> bossByMap = {
-  1: EnemyTemplate(name: 'Goblin King', type: 'boss', hp: 120, attack: 14, defense: 8, speed: 7, magic: 4, xpReward: 80, goldReward: 50,
+  1: EnemyTemplate(name: 'Goblin King', type: 'boss', hp: 55, attack: 7, defense: 4, speed: 7, magic: 2, xpReward: 80, goldReward: 50,
     abilities: [
-      Ability(name: 'Royal Slash', description: 'The king strikes!', damage: 14, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
-      Ability(name: 'Call Minions', description: 'Summon goblins to help.', damage: 8, refreshChance: 60, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 1),
+      Ability(name: 'Royal Slash', description: 'The king strikes!', damage: 7, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
+      Ability(name: 'Call Minions', description: 'Summon goblins to help.', damage: 4, refreshChance: 50, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 1),
     ]),
-  2: EnemyTemplate(name: 'Bone Lord', type: 'boss', hp: 160, attack: 16, defense: 12, speed: 5, magic: 10, xpReward: 120, goldReward: 80,
+  2: EnemyTemplate(name: 'Bone Lord', type: 'boss', hp: 90, attack: 10, defense: 7, speed: 5, magic: 6, xpReward: 120, goldReward: 80,
     abilities: [
-      Ability(name: 'Bone Crush', description: 'Crushing bones!', damage: 16, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
-      Ability(name: 'Summon Skeletons', description: 'Raise the dead.', damage: 10, refreshChance: 50, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 1),
+      Ability(name: 'Bone Crush', description: 'Crushing bones!', damage: 10, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
+      Ability(name: 'Summon Skeletons', description: 'Raise the dead.', damage: 6, refreshChance: 45, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 1),
     ]),
-  3: EnemyTemplate(name: 'Shadow Witch', type: 'boss', hp: 140, attack: 10, defense: 8, speed: 10, magic: 22, xpReward: 160, goldReward: 110,
+  3: EnemyTemplate(name: 'Shadow Witch', type: 'boss', hp: 120, attack: 8, defense: 6, speed: 10, magic: 16, xpReward: 160, goldReward: 110,
     abilities: [
-      Ability(name: 'Dark Blast', description: 'Blasts of shadow magic.', damage: 22, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
-      Ability(name: 'Curse All', description: 'Curse the entire party.', damage: 14, refreshChance: 45, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 1),
+      Ability(name: 'Dark Blast', description: 'Blasts of shadow magic.', damage: 16, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
+      Ability(name: 'Curse All', description: 'Curse the entire party.', damage: 10, refreshChance: 40, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 1),
     ]),
   4: EnemyTemplate(name: 'Mountain Giant', type: 'boss', hp: 250, attack: 22, defense: 16, speed: 3, magic: 0, xpReward: 200, goldReward: 140,
     abilities: [
@@ -140,41 +140,43 @@ final Map<int, EnemyTemplate> bossByMap = {
     ]),
 };
 
-// Army soldiers - scales with current map
+// Army soldiers - scales with current map (gentler at low maps)
 List<EnemyTemplate> armySoldiers(int mapNumber) {
-  final scale = mapNumber;
+  // Softer early scaling: maps 1-2 use reduced multiplier
+  final scale = mapNumber <= 2 ? mapNumber * 0.5 : mapNumber.toDouble();
+  final s = scale.round();
   return [
     // Army Fighters (most common) - tanky melee
     EnemyTemplate(
       name: 'Army Fighter', type: 'bandit',
-      hp: 35 + scale * 12, attack: 7 + scale * 3, defense: 6 + scale * 2,
-      speed: 5 + scale, magic: 0,
-      xpReward: 15 + scale * 5, goldReward: 5 + scale * 3,
+      hp: 25 + s * 12, attack: 5 + s * 3, defense: 4 + s * 2,
+      speed: 5 + s, magic: 0,
+      xpReward: 15 + s * 5, goldReward: 5 + s * 3,
       abilities: [
-        Ability(name: 'Sword Slash', description: 'A disciplined slash.', damage: 7 + scale * 3, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
-        Ability(name: 'Shield Bash', description: 'Bash with a heavy shield.', damage: 5 + scale * 2, refreshChance: 50, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1),
+        Ability(name: 'Sword Slash', description: 'A disciplined slash.', damage: 5 + s * 3, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
+        Ability(name: 'Shield Bash', description: 'Bash with a heavy shield.', damage: 3 + s * 2, refreshChance: 50, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1),
       ],
     ),
     // Army Clerics - heal allies
     EnemyTemplate(
       name: 'Army Cleric', type: 'dark_mage',
-      hp: 30 + scale * 8, attack: 4 + scale * 2, defense: 4 + scale * 2,
-      speed: 4 + scale, magic: 6 + scale * 3,
-      xpReward: 18 + scale * 5, goldReward: 8 + scale * 3,
+      hp: 20 + s * 8, attack: 3 + s * 2, defense: 3 + s * 2,
+      speed: 4 + s, magic: 4 + s * 3,
+      xpReward: 18 + s * 5, goldReward: 8 + s * 3,
       abilities: [
-        Ability(name: 'Mace Strike', description: 'A holy mace blow.', damage: 4 + scale * 2, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
-        Ability(name: 'Heal Ally', description: 'Heal a wounded soldier.', damage: -(8 + scale * 3), refreshChance: 60, targetType: AbilityTarget.self, unlockedAtLevel: 1),
+        Ability(name: 'Mace Strike', description: 'A holy mace blow.', damage: 3 + s * 2, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
+        Ability(name: 'Heal Ally', description: 'Heal a wounded soldier.', damage: -(6 + s * 3), refreshChance: 60, targetType: AbilityTarget.self, unlockedAtLevel: 1),
       ],
     ),
     // Army Wizards - high damage, low hp
     EnemyTemplate(
       name: 'Army Wizard', type: 'dark_mage',
-      hp: 25 + scale * 6, attack: 3 + scale, defense: 3 + scale,
-      speed: 5 + scale, magic: 8 + scale * 4,
-      xpReward: 20 + scale * 6, goldReward: 10 + scale * 4,
+      hp: 16 + s * 6, attack: 2 + s, defense: 2 + s,
+      speed: 5 + s, magic: 5 + s * 4,
+      xpReward: 20 + s * 6, goldReward: 10 + s * 4,
       abilities: [
-        Ability(name: 'Fire Bolt', description: 'A bolt of fire.', damage: 8 + scale * 4, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
-        Ability(name: 'Arcane Blast', description: 'Blast all foes.', damage: 5 + scale * 2, refreshChance: 40, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 1),
+        Ability(name: 'Fire Bolt', description: 'A bolt of fire.', damage: 5 + s * 4, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
+        Ability(name: 'Arcane Blast', description: 'Blast all foes.', damage: 3 + s * 2, refreshChance: 40, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 1),
       ],
     ),
   ];

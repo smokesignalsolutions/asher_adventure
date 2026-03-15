@@ -17,11 +17,27 @@ class CombatService {
   }
 
   static CombatState initCombat(List<Character> party, List<Enemy> enemies) {
-    final turnOrder = <CombatantEntry>[];
+    final turnOrder = buildGroupedTurnOrder(party, enemies);
+
+    return CombatState(
+      allies: party,
+      enemies: enemies,
+      turnOrder: turnOrder,
+      combatLog: ['Combat begins!'],
+    );
+  }
+
+  /// Build turn order with grouped sides: all allies then all enemies
+  /// (or vice versa). Which side goes first is decided by comparing
+  /// the best initiative roll from each side.
+  static List<CombatantEntry> buildGroupedTurnOrder(
+      List<Character> party, List<Enemy> enemies) {
+    final allyEntries = <CombatantEntry>[];
+    final enemyEntries = <CombatantEntry>[];
 
     for (final char in party) {
       if (char.isAlive) {
-        turnOrder.add(CombatantEntry(
+        allyEntries.add(CombatantEntry(
           id: char.id,
           name: char.name,
           isAlly: true,
@@ -32,7 +48,7 @@ class CombatService {
 
     for (final enemy in enemies) {
       if (enemy.isAlive) {
-        turnOrder.add(CombatantEntry(
+        enemyEntries.add(CombatantEntry(
           id: enemy.id,
           name: enemy.name,
           isAlly: false,
@@ -41,15 +57,19 @@ class CombatService {
       }
     }
 
-    // Sort descending by initiative (highest goes first)
-    turnOrder.sort((a, b) => b.initiative.compareTo(a.initiative));
+    // Sort within each group by initiative (highest first)
+    allyEntries.sort((a, b) => b.initiative.compareTo(a.initiative));
+    enemyEntries.sort((a, b) => b.initiative.compareTo(a.initiative));
 
-    return CombatState(
-      allies: party,
-      enemies: enemies,
-      turnOrder: turnOrder,
-      combatLog: ['Combat begins!'],
-    );
+    // Best roll from each side decides which group goes first
+    final bestAlly = allyEntries.isEmpty ? 0.0 : allyEntries.first.initiative;
+    final bestEnemy = enemyEntries.isEmpty ? 0.0 : enemyEntries.first.initiative;
+
+    if (bestAlly >= bestEnemy) {
+      return [...allyEntries, ...enemyEntries];
+    } else {
+      return [...enemyEntries, ...allyEntries];
+    }
   }
 
   static int calculateDamage(int attackStat, int abilityDamage, int targetDefense) {

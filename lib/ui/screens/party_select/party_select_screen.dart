@@ -41,9 +41,11 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
   Future<void> _startGame() async {
     if (_selectedClasses.length != 1) return;
 
-    await ref.read(gameStateProvider.notifier).startNewGame(
+    final notifier = ref.read(gameStateProvider.notifier);
+    await notifier.startNewGame(
       _selectedClasses,
       _difficulty,
+      slot: notifier.activeSlot,
     );
 
     if (mounted) context.go('/map');

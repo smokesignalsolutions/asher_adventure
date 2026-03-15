@@ -10,6 +10,7 @@ import '../../../models/character.dart';
 import '../../../models/combat_state.dart';
 import '../../../models/enemy.dart';
 import '../../../models/enums.dart';
+import '../../../data/map_backgrounds.dart';
 import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../services/audio_service.dart';
@@ -27,13 +28,6 @@ class _AttackLineData {
   const _AttackLineData(this.attackerId, this.targetId, this.amount, this.isHealing, this.isSpell);
 }
 
-// ---------------------------------------------------------------------------
-// Combat backgrounds
-// ---------------------------------------------------------------------------
-const _backgrounds = [
-  'meadow', 'desert', 'forest', 'mountain', 'cave',
-  'swamp', 'castle', 'beach', 'snow', 'ruins',
-];
 
 // ---------------------------------------------------------------------------
 // Combat screen
@@ -75,14 +69,15 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       parent: _lineAnimController,
       curve: Curves.easeOutCubic,
     );
-    _backgroundPath = 'assets/sprites/backgrounds/'
-        '${_backgrounds[Random().nextInt(_backgrounds.length)]}.png';
+    _backgroundPath = 'assets/sprites/backgrounds/meadow.png'; // default, set in _initCombat
     WidgetsBinding.instance.addPostFrameCallback((_) => _initCombat());
   }
 
   void _initCombat() {
     final gameState = ref.read(gameStateProvider);
     if (gameState == null) return;
+
+    _backgroundPath = combatBackground(gameState.currentMapNumber);
 
     final notifier = ref.read(gameStateProvider.notifier);
     final currentNode = gameState.currentMap.currentNode;
@@ -208,31 +203,14 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         CombatService.refreshAbilities(enemy.abilities);
       }
 
-      _combat!.turnOrder.clear();
-      for (final char in _combat!.allies) {
-        if (char.isAlive) {
-          _combat!.turnOrder.add(CombatantEntry(
-            id: char.id,
-            name: char.name,
-            isAlly: true,
-            initiative:
-                CombatService.rollInitiative(char.totalSpeed.toDouble()),
-          ));
+      // Keep same group order, just remove dead combatants
+      _combat!.turnOrder.removeWhere((entry) {
+        if (entry.isAlly) {
+          return !_combat!.allies.any((a) => a.id == entry.id && a.isAlive);
+        } else {
+          return !_combat!.enemies.any((e) => e.id == entry.id && e.isAlive);
         }
-      }
-      for (final enemy in _combat!.enemies) {
-        if (enemy.isAlive) {
-          _combat!.turnOrder.add(CombatantEntry(
-            id: enemy.id,
-            name: enemy.name,
-            isAlly: false,
-            initiative:
-                CombatService.rollInitiative(enemy.speed.toDouble()),
-          ));
-        }
-      }
-      _combat!.turnOrder
-          .sort((a, b) => b.initiative.compareTo(a.initiative));
+      });
     }
     _processNextTurn();
   }

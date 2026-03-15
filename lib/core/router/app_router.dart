@@ -8,6 +8,7 @@ import '../../ui/screens/rest/rest_screen.dart';
 import '../../ui/screens/treasure/treasure_screen.dart';
 import '../../ui/screens/event/event_screen.dart';
 import '../../ui/screens/recruit/recruit_screen.dart';
+import '../../ui/screens/help/help_screen.dart';
 import '../../ui/screens/game_over/game_over_screen.dart';
 import '../../ui/screens/victory/victory_screen.dart';
 
@@ -23,6 +24,7 @@ final appRouter = GoRouter(
     GoRoute(path: '/treasure', builder: (context, state) => const TreasureScreen()),
     GoRoute(path: '/event', builder: (context, state) => const EventScreen()),
     GoRoute(path: '/recruit', builder: (context, state) => const RecruitScreen()),
+    GoRoute(path: '/help', builder: (context, state) => const HelpScreen()),
     GoRoute(path: '/game-over', builder: (context, state) => const GameOverScreen()),
     GoRoute(path: '/victory', builder: (context, state) => const VictoryScreen()),
   ],
