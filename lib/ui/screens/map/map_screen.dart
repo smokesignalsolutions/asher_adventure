@@ -28,8 +28,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _showMutatorAnnouncement() {
     final gameState = ref.read(gameStateProvider);
     if (gameState == null) return;
+    // Only show on the very first node of map 1 (start node, column 0)
     if (gameState.currentMapNumber != 1) return;
     if (gameState.mapsCompletedThisRun > 0) return;
+    if (gameState.currentMap.currentNode.column != 0) return;
 
     final mutator = getMutatorById(gameState.activeMutator);
     if (mutator == null) return;
