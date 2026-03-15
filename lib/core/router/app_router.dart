@@ -11,6 +11,7 @@ import '../../ui/screens/recruit/recruit_screen.dart';
 import '../../ui/screens/help/help_screen.dart';
 import '../../ui/screens/legacy_hall/legacy_hall_screen.dart';
 import '../../ui/screens/game_over/game_over_screen.dart';
+import '../../ui/screens/codex/codex_screen.dart';
 import '../../ui/screens/victory/victory_screen.dart';
 
 final appRouter = GoRouter(
@@ -28,6 +29,7 @@ final appRouter = GoRouter(
     GoRoute(path: '/help', builder: (context, state) => const HelpScreen()),
     GoRoute(path: '/legacy-hall', builder: (context, state) => const LegacyHallScreen()),
     GoRoute(path: '/game-over', builder: (context, state) => const GameOverScreen()),
+    GoRoute(path: '/codex', builder: (context, state) => const CodexScreen()),
     GoRoute(path: '/victory', builder: (context, state) => const VictoryScreen()),
   ],
 );

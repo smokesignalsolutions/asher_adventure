@@ -180,6 +180,20 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
                           ref
                               .read(audioProvider.notifier)
                               .playSfx(SfxType.menuSelect);
+                          context.go('/codex');
+                        },
+                        icon: const Icon(Icons.auto_stories),
+                        label: const Text('Codex'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: 220,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          ref
+                              .read(audioProvider.notifier)
+                              .playSfx(SfxType.menuSelect);
                           context.go('/help');
                         },
                         icon: const Icon(Icons.menu_book),
