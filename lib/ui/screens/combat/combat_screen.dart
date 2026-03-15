@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/ability_icons.dart';
@@ -55,6 +56,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
 
   // Army fight flag
   bool _isArmyFight = false;
+
+  // Keyboard focus for number key shortcuts
+  final _focusNode = FocusNode();
 
   // Boss fight flag
   bool _isBossFight = false;
@@ -400,8 +404,48 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     }
   }
 
+  void _handleKeyPress(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+    if (!_waitingForInput || _combat == null || _combat!.isComplete) return;
+
+    final current = _combat!.currentCombatant;
+    final char = _combat!.allies.firstWhere((c) => c.id == current.id);
+    final abilities =
+        char.abilities.where((a) => a.unlockedAtLevel <= char.level).toList();
+
+    int? index;
+    if (event.logicalKey == LogicalKeyboardKey.digit1) index = 0;
+    if (event.logicalKey == LogicalKeyboardKey.digit2) index = 1;
+    if (event.logicalKey == LogicalKeyboardKey.digit3) index = 2;
+    if (event.logicalKey == LogicalKeyboardKey.digit4) index = 3;
+    if (event.logicalKey == LogicalKeyboardKey.digit5) index = 4;
+
+    if (index == null || index >= abilities.length) return;
+    final ability = abilities[index];
+    if (!ability.isAvailable) return;
+
+    // Same logic as the tap handler
+    setState(() {
+      _selectedAbility = ability;
+      _potionMode = false;
+    });
+    if (ability.targetType == AbilityTarget.self) {
+      _useAbility(ability, char);
+    } else if (ability.targetType == AbilityTarget.allEnemies ||
+        ability.targetType == AbilityTarget.allAllies) {
+      _useAbility(ability, null);
+    } else if (ability.targetType == AbilityTarget.singleEnemy) {
+      final alive = _combat!.enemies.where((e) => e.isAlive).toList();
+      if (alive.length == 1) _useAbility(ability, alive.first);
+    } else if (ability.targetType == AbilityTarget.singleAlly) {
+      final alive = _combat!.allies.where((a) => a.isAlive).toList();
+      if (alive.length == 1) _useAbility(ability, alive.first);
+    }
+  }
+
   @override
   void dispose() {
+    _focusNode.dispose();
     _lineAnimController.dispose();
     _logController.dispose();
     super.dispose();
@@ -445,7 +489,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     final currentCombatant =
         _combat!.isComplete ? null : _combat!.currentCombatant;
 
-    return Scaffold(
+    return KeyboardListener(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyPress,
+      child: Scaffold(
       body: SafeArea(
         child: Column(
           children: [
@@ -491,6 +539,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -934,7 +983,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                     },
                   ),
                 // Ability boxes
-                ...abilities.map((ability) {
+                ...abilities.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final ability = entry.value;
                   final isSelected =
                       _selectedAbility?.name == ability.name;
                   final canUse = ability.isAvailable;
@@ -942,6 +993,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                   return _buildAbilityBox(
                     theme: theme,
                     label: ability.name,
+                    keyNumber: index < 5 ? index + 1 : null,
                     iconWidget: Image.asset(
                       abilityIconPath(ability.name),
                       width: 96,
@@ -1007,6 +1059,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     required Widget iconWidget,
     required bool isSelected,
     required bool canUse,
+    int? keyNumber,
     Color? selectedColor,
     VoidCallback? onTap,
   }) {
@@ -1027,7 +1080,10 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       onTap: onTap,
       child: Opacity(
         opacity: canUse ? 1.0 : 0.5,
-        child: Container(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+          Container(
           width: 170,
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -1093,6 +1149,37 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
               ),
             ],
           ),
+        ),
+          if (keyNumber != null)
+            Positioned(
+              top: -4,
+              left: -4,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '$keyNumber',
+                  style: TextStyle(
+                    color: theme.colorScheme.onPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
