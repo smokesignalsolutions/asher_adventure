@@ -175,7 +175,7 @@ class CombatService {
 
     final logs = <String>[];
 
-    if (ability.damage > 0) {
+    if (ability.damage > 0 || target is Enemy) {
       // --- OFFENSIVE: damage + optional debuffs/drain/vulnerability ---
       final Enemy enemyTarget = target as Enemy;
 

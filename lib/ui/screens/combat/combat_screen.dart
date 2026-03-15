@@ -774,7 +774,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     final spriteSize = _spriteSize(_combat!.allies.length);
     final spritePath = classSpritePath(ally.characterClass);
 
-    return AnimatedContainer(
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -853,6 +855,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             ),
         ],
       ),
+    ),
     );
   }
 
@@ -862,7 +865,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     final spriteSize = _spriteSize(_combat!.enemies.length);
     final spritePath = enemySpritePathByName(enemy.name);
 
-    return AnimatedContainer(
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -936,6 +941,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             ),
         ],
       ),
+    ),
     );
   }
 
