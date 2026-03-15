@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../models/game_state.dart';
 import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../services/audio_service.dart';
@@ -17,71 +16,44 @@ class TitleScreen extends ConsumerStatefulWidget {
 
 class _TitleScreenState extends ConsumerState<TitleScreen> {
   bool _isLoading = true;
-  List<GameState?> _slots = [];
+  bool _hasAnySave = false;
 
   @override
   void initState() {
     super.initState();
-    _loadSlots();
+    _checkForSave();
   }
 
-  Future<void> _loadSlots() async {
-    await SaveService.migrateOldSave();
-    final slots = await SaveService.loadAllSlots();
+  Future<void> _checkForSave() async {
+    final json = await SaveService.loadRunSaveJson();
     setState(() {
-      _slots = slots;
+      _hasAnySave = json != null;
       _isLoading = false;
     });
   }
 
-  bool get _hasAnySave => _slots.any((s) => s != null);
-
-  void _showLoadDialog() {
+  void _handleLoadGame() {
     ref.read(audioProvider.notifier).playSfx(SfxType.menuSelect);
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => _SlotPickerSheet(
-        title: 'Load Game',
-        slots: _slots,
-        onSlotTap: (slot) {
-          Navigator.pop(ctx);
-          _loadSlot(slot);
-        },
-        emptySlotTappable: false,
-      ),
-    );
+    _loadSlot();
   }
 
-  void _showNewGameDialog() {
+  void _handleNewGame() {
     ref.read(audioProvider.notifier).playSfx(SfxType.menuSelect);
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => _SlotPickerSheet(
-        title: 'Select Save Slot',
-        slots: _slots,
-        onSlotTap: (slot) {
-          Navigator.pop(ctx);
-          if (_slots[slot] != null) {
-            _confirmOverwrite(slot);
-          } else {
-            _startNewInSlot(slot);
-          }
-        },
-        emptySlotTappable: true,
-      ),
-    );
+    if (_hasAnySave) {
+      _confirmOverwrite();
+    } else {
+      _startNew();
+    }
   }
 
-  void _confirmOverwrite(int slot) {
+  void _confirmOverwrite() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Overwrite Save?'),
-        content: Text(
-          'Slot ${slot + 1} has an existing game '
-          '(Map ${_slots[slot]!.currentMapNumber}, '
-          '${_slots[slot]!.party.length} heroes). '
-          'Start a new game here?',
+        content: const Text(
+          'You have an existing run in progress. '
+          'Start a new game and overwrite it?',
         ),
         actions: [
           TextButton(
@@ -91,7 +63,7 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _startNewInSlot(slot);
+              _startNew();
             },
             child: const Text('Overwrite'),
           ),
@@ -100,14 +72,12 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
     );
   }
 
-  Future<void> _loadSlot(int slot) async {
-    await ref.read(gameStateProvider.notifier).loadGame(slot);
+  Future<void> _loadSlot() async {
+    await ref.read(gameStateProvider.notifier).loadGame();
     if (mounted) context.go('/map');
   }
 
-  void _startNewInSlot(int slot) {
-    // Store chosen slot, then go to party select
-    ref.read(gameStateProvider.notifier).loadGame(slot);
+  void _startNew() {
     context.go('/party-select');
   }
 
@@ -154,7 +124,7 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
                     SizedBox(
                       width: 220,
                       child: FilledButton.icon(
-                        onPressed: _showNewGameDialog,
+                        onPressed: _handleNewGame,
                         icon: const Icon(Icons.add),
                         label: const Text('New Game'),
                       ),
@@ -164,9 +134,9 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
                       SizedBox(
                         width: 220,
                         child: FilledButton.tonalIcon(
-                          onPressed: _showLoadDialog,
+                          onPressed: _handleLoadGame,
                           icon: const Icon(Icons.folder_open),
-                          label: const Text('Load Game'),
+                          label: const Text('Continue'),
                         ),
                       ),
                     ],
@@ -186,134 +156,6 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
                     ),
                   ],
                 ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Slot picker bottom sheet
-// ---------------------------------------------------------------------------
-class _SlotPickerSheet extends StatelessWidget {
-  final String title;
-  final List<GameState?> slots;
-  final void Function(int slot) onSlotTap;
-  final bool emptySlotTappable;
-
-  const _SlotPickerSheet({
-    required this.title,
-    required this.slots,
-    required this.onSlotTap,
-    required this.emptySlotTappable,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            title,
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          Flexible(
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: slots.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) =>
-                  _buildSlotCard(context, theme, i, slots[i]),
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSlotCard(
-      BuildContext context, ThemeData theme, int index, GameState? save) {
-    final hasData = save != null;
-    final tappable = hasData || emptySlotTappable;
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      color: tappable ? null : theme.colorScheme.surfaceContainerHigh,
-      child: InkWell(
-        onTap: tappable ? () => onSlotTap(index) : null,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: hasData
-                    ? theme.colorScheme.primaryContainer
-                    : theme.colorScheme.surfaceContainerHighest,
-                child: Text(
-                  '${index + 1}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: hasData
-                        ? theme.colorScheme.onPrimaryContainer
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: hasData
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Map ${save.currentMapNumber} of 8 '
-                            '- ${save.difficulty.name.toUpperCase()}',
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${save.party.length} hero${save.party.length == 1 ? '' : 'es'}'
-                            '  |  ${save.gold}g'
-                            '  |  Lv ${save.party.isEmpty ? 1 : save.party.first.level}',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            save.party.map((c) => c.name.split(' ').first).join(', '),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.6),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      )
-                    : Text(
-                        'Empty Slot',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.4),
-                        ),
-                      ),
-              ),
-              if (tappable)
-                Icon(
-                  Icons.chevron_right,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                ),
-            ],
-          ),
         ),
       ),
     );

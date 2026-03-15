@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -20,20 +21,17 @@ final _random = Random();
 class GameStateNotifier extends StateNotifier<GameState?> {
   GameStateNotifier() : super(null);
 
-  int _activeSlot = 0;
-  int get activeSlot => _activeSlot;
-
-  Future<void> loadGame([int slot = 0]) async {
-    _activeSlot = slot;
-    state = await SaveService.loadSave(slot);
+  Future<void> loadGame() async {
+    final json = await SaveService.loadRunSaveJson();
+    if (json != null) {
+      state = GameState.fromJson(jsonDecode(json));
+    }
   }
 
   Future<void> startNewGame(
     List<CharacterClass> selectedClasses,
-    DifficultyLevel difficulty, {
-    int slot = 0,
-  }) async {
-    _activeSlot = slot;
+    DifficultyLevel difficulty,
+  ) async {
     NameGenerator.reset();
     final party = <Character>[];
 
@@ -92,6 +90,9 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     totalEnemiesDefeated: state!.totalEnemiesDefeated,
     totalGoldEarned: state!.totalGoldEarned,
     armyMoveAccumulator: state!.armyMoveAccumulator,
+    mapsCompletedThisRun: state!.mapsCompletedThisRun,
+    bossesKilledThisRun: state!.bossesKilledThisRun,
+    uniqueEnemyTypesKilledThisRun: Set.from(state!.uniqueEnemyTypesKilledThisRun),
   );
 
   Future<void> moveToNode(String nodeId) async {
@@ -204,16 +205,26 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     ];
   }
 
-  Future<void> completeCombat(int xpGained, int goldGained) async {
+  Future<void> completeCombat(
+    int xpGained,
+    int goldGained, {
+    List<String> killedEnemyTypes = const [],
+    bool bossKilled = false,
+  }) async {
     if (state == null) return;
 
-    // Everyone gets full XP (alive or dead)
     for (final char in state!.party) {
       ProgressionService.addXp(char, xpGained);
     }
 
     state!.gold += goldGained;
     state!.totalGoldEarned += goldGained;
+
+    // Track enemy types killed this run
+    state!.uniqueEnemyTypesKilledThisRun.addAll(killedEnemyTypes);
+    if (bossKilled) {
+      state!.bossesKilledThisRun++;
+    }
 
     state = _refreshState();
     await _autoSave();
@@ -285,17 +296,20 @@ class GameStateNotifier extends StateNotifier<GameState?> {
   Future<void> advanceToNextMap() async {
     if (state == null) return;
     final nextMap = state!.currentMapNumber + 1;
-    if (nextMap > 8) return; // Game won!
+    if (nextMap > 8) return;
 
     state = GameState(
       party: state!.party,
-      gold: state!.gold,
+      gold: 0, // Gold resets between maps
       healthPotions: state!.healthPotions,
       currentMapNumber: nextMap,
       currentMap: MapService.generateMap(nextMap),
       difficulty: state!.difficulty,
       totalEnemiesDefeated: state!.totalEnemiesDefeated,
       totalGoldEarned: state!.totalGoldEarned,
+      mapsCompletedThisRun: state!.mapsCompletedThisRun + 1,
+      bossesKilledThisRun: state!.bossesKilledThisRun,
+      uniqueEnemyTypesKilledThisRun: state!.uniqueEnemyTypesKilledThisRun,
     );
 
     ScoutingService.scoutAdjacentNodes(state!.currentMap, state!.party);
@@ -374,14 +388,21 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     await _autoSave();
   }
 
+  /// Returns the final GameState snapshot for LP calculation, then clears state.
+  GameState? endRun() {
+    final snapshot = state;
+    state = null;
+    return snapshot;
+  }
+
   Future<void> gameOver() async {
-    await SaveService.deleteSave(_activeSlot);
+    await SaveService.deleteRunSave();
     state = null;
   }
 
   Future<void> _autoSave() async {
     if (state != null) {
-      await SaveService.autoSave(state!, _activeSlot);
+      await SaveService.autoSaveRun(state!.toJson());
     }
   }
 }

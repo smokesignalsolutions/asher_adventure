@@ -44,7 +44,6 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
     await notifier.startNewGame(
       _selectedClasses,
       _difficulty,
-      slot: notifier.activeSlot,
     );
 
     if (mounted) context.go('/map');
