@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../data/mutator_data.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../widgets/audio_controls.dart';
+import '../../widgets/help_button.dart';
 
 class RestScreen extends ConsumerWidget {
   const RestScreen({super.key});
@@ -25,7 +26,7 @@ class RestScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rest Stop'),
-        actions: const [AudioMuteButton()],
+        actions: const [HelpButton(), AudioMuteButton()],
       ),
       body: Center(
         child: Padding(

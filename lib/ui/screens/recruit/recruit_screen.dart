@@ -5,8 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../../data/class_data.dart';
 import '../../../data/recruit_data.dart';
 import '../../../data/sprite_data.dart';
+import '../../../models/character.dart';
 import '../../../models/enums.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../providers/help_mode_provider.dart';
+import '../../widgets/audio_controls.dart';
+import '../../widgets/help_button.dart';
+import '../../widgets/help_dialogs.dart';
 
 class RecruitScreen extends ConsumerStatefulWidget {
   const RecruitScreen({super.key});
@@ -59,6 +64,29 @@ class _RecruitScreenState extends ConsumerState<RecruitScreen> {
     }
   }
 
+  void _onCardTap(CharacterClass cls) {
+    if (ref.read(helpModeProvider)) {
+      ref.read(helpModeProvider.notifier).state = false;
+      final def = classDefinitions[cls]!;
+      final character = Character(
+        id: 'preview_${cls.name}',
+        name: def.name,
+        characterClass: cls,
+        currentHp: def.baseStats.hp,
+        maxHp: def.baseStats.hp,
+        attack: def.baseStats.attack,
+        defense: def.baseStats.defense,
+        speed: def.baseStats.speed,
+        magic: def.baseStats.magic,
+        abilities: def.abilities
+            .where((a) => a.unlockedAtLevel <= 1)
+            .toList(),
+      );
+      showCharacterHelp(context, character);
+      return;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final gameState = ref.watch(gameStateProvider);
@@ -71,7 +99,10 @@ class _RecruitScreenState extends ConsumerState<RecruitScreen> {
     final partyFull = gameState.party.length >= 4;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Tavern')),
+      appBar: AppBar(
+        title: const Text('Tavern'),
+        actions: const [HelpButton(), AudioMuteButton()],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -126,45 +157,48 @@ class _RecruitScreenState extends ConsumerState<RecruitScreen> {
                     final canAfford = gameState.gold >= cost;
 
                     return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            // Class sprite
-                            Image.asset(
-                              classSpritePath(cls),
-                              width: 48,
-                              height: 48,
-                              filterQuality: FilterQuality.none,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(Icons.person, size: 48),
-                            ),
-                            const SizedBox(width: 12),
-                            // Class info
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    def.name,
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.bold),
-                                  ),
-                                  Text(
-                                    'HP:${def.baseStats.hp} ATK:${def.baseStats.attack} '
-                                    'DEF:${def.baseStats.defense} SPD:${def.baseStats.speed} '
-                                    'MAG:${def.baseStats.magic}',
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                ],
+                      child: InkWell(
+                        onTap: () => _onCardTap(cls),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              // Class sprite
+                              Image.asset(
+                                classSpritePath(cls),
+                                width: 48,
+                                height: 48,
+                                filterQuality: FilterQuality.none,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const Icon(Icons.person, size: 48),
                               ),
-                            ),
-                            // Hire button
-                            FilledButton(
-                              onPressed: canAfford ? () => _hire(cls) : null,
-                              child: Text('${cost}g'),
-                            ),
-                          ],
+                              const SizedBox(width: 12),
+                              // Class info
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      def.name,
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                      'HP:${def.baseStats.hp} ATK:${def.baseStats.attack} '
+                                      'DEF:${def.baseStats.defense} SPD:${def.baseStats.speed} '
+                                      'MAG:${def.baseStats.magic}',
+                                      style: theme.textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Hire button
+                              FilledButton(
+                                onPressed: canAfford ? () => _hire(cls) : null,
+                                child: Text('${cost}g'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );

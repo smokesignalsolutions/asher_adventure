@@ -8,6 +8,7 @@ import '../../../providers/game_state_provider.dart';
 import '../../../providers/player_profile_provider.dart';
 import '../../../services/audio_service.dart';
 import '../../widgets/audio_controls.dart';
+import '../../widgets/help_button.dart';
 
 class _EventChoice {
   final String text;
@@ -429,7 +430,7 @@ class _EventScreenState extends ConsumerState<EventScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Event'),
-        actions: const [AudioMuteButton()],
+        actions: const [HelpButton(), AudioMuteButton()],
       ),
       body: Center(
         child: Padding(
