@@ -9,7 +9,10 @@ import '../../../models/map_node.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../services/progression_service.dart';
 import '../../../services/scouting_service.dart';
+import '../../../providers/help_mode_provider.dart';
 import '../../widgets/audio_controls.dart';
+import '../../widgets/help_button.dart';
+import '../../widgets/help_dialogs.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -80,6 +83,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       appBar: AppBar(
         title: Text('Map ${gameState.currentMapNumber} of 8'),
         actions: [
+          const HelpButton(),
           const AudioMuteButton(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -217,7 +221,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                             radius: nodeRadius,
                             onTap: currentNode.connections.contains(node.id) &&
                                     node.id != currentNode.id
-                                ? () => _moveToNode(node)
+                                ? () {
+                                    if (ref.read(helpModeProvider)) {
+                                      ref.read(helpModeProvider.notifier).state = false;
+                                      showNodeHelp(context, node.type);
+                                      return;
+                                    }
+                                    _moveToNode(node);
+                                  }
                                 : null,
                           ),
                         ),

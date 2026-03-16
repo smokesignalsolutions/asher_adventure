@@ -13,7 +13,10 @@ import '../../../data/mutator_data.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../providers/player_profile_provider.dart';
 import '../../../services/audio_service.dart';
+import '../../../providers/help_mode_provider.dart';
 import '../../widgets/audio_controls.dart';
+import '../../widgets/help_button.dart';
+import '../../widgets/help_dialogs.dart';
 
 class TreasureScreen extends ConsumerStatefulWidget {
   const TreasureScreen({super.key});
@@ -107,7 +110,7 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Treasure!'),
-        actions: const [AudioMuteButton()],
+        actions: const [HelpButton(), AudioMuteButton()],
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -133,20 +136,29 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
                 const SizedBox(height: 16),
               ],
               if (_loot != null) ...[
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Text(
-                          _loot!.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: _rarityColor(_loot!.rarity),
-                            fontWeight: FontWeight.bold,
+                GestureDetector(
+                  onTap: () {
+                    if (ref.read(helpModeProvider)) {
+                      ref.read(helpModeProvider.notifier).state = false;
+                      showItemHelp(context, _loot!);
+                      return;
+                    }
+                  },
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Text(
+                            _loot!.name,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: _rarityColor(_loot!.rarity),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        Text(_itemStats(_loot!)),
-                      ],
+                          Text(_itemStats(_loot!)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -164,7 +176,14 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
                       child: SizedBox(
                         width: 280,
                         child: OutlinedButton(
-                          onPressed: () => _equipTo(char),
+                          onPressed: () {
+                            if (ref.read(helpModeProvider)) {
+                              ref.read(helpModeProvider.notifier).state = false;
+                              showCharacterHelp(context, char);
+                              return;
+                            }
+                            _equipTo(char);
+                          },
                           child: Text(
                             '${char.name.split(' ').first} ($className)\n'
                             'Current: $currentLabel',

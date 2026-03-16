@@ -11,7 +11,9 @@ import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../providers/player_profile_provider.dart';
 import '../../../services/audio_service.dart';
+import '../../../providers/help_mode_provider.dart';
 import '../../widgets/audio_controls.dart';
+import '../../widgets/help_button.dart';
 
 class PartySelectScreen extends ConsumerStatefulWidget {
   const PartySelectScreen({super.key});
@@ -77,7 +79,7 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Choose Your Hero'),
-        actions: const [AudioMuteButton()],
+        actions: const [HelpButton(), AudioMuteButton()],
       ),
       body: Column(
         children: [
@@ -180,7 +182,42 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
                     trailing: selected
                         ? Icon(Icons.check_circle, color: theme.colorScheme.primary)
                         : const Icon(Icons.circle_outlined),
-                    onTap: () => _toggleClass(cls),
+                    onTap: () {
+                      if (ref.read(helpModeProvider)) {
+                        ref.read(helpModeProvider.notifier).state = false;
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: Text(def.name),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('Base Stats:', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
+                                  Text('HP: ${def.baseStats.hp}  ATK: ${def.baseStats.attack}  DEF: ${def.baseStats.defense}  SPD: ${def.baseStats.speed}  MAG: ${def.baseStats.magic}'),
+                                  const Divider(),
+                                  Text('Abilities:', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
+                                  ...def.abilities.map((a) => Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 2),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(a.name, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                                        Text(a.description, style: Theme.of(context).textTheme.bodySmall),
+                                      ],
+                                    ),
+                                  )),
+                                ],
+                              ),
+                            ),
+                            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
+                          ),
+                        );
+                        return;
+                      }
+                      _toggleClass(cls);
+                    },
                   ),
                 );
               },
