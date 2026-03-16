@@ -128,11 +128,11 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     initiativeModifier: 2.0,
     unlockedByDefault: true,
     abilities: [
-      Ability(name: 'Arrow Shot', description: 'Fire an arrow at the enemy.', damage: 11, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
-      Ability(name: 'Twin Shot', description: 'Fire two arrows rapidly.', damage: 16, refreshChance: 55, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 3),
-      Ability(name: 'Volley', description: 'Rain arrows on all foes.', damage: 10, refreshChance: 40, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 5),
+      Ability(name: 'Arrow Shot', description: 'Fire an arrow at the enemy. 15% chance to pierce.', damage: 10, refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
+      Ability(name: 'Twin Shot', description: 'Fire two arrows rapidly. 15% chance to pierce.', damage: 14, refreshChance: 55, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 3),
+      Ability(name: 'Volley', description: 'Rain arrows on all foes. Each arrow has 15% chance to pierce.', damage: 9, refreshChance: 40, targetType: AbilityTarget.allEnemies, unlockedAtLevel: 5),
       Ability(name: 'Nature\'s Blessing', description: 'The forest heals an ally.', damage: -18, refreshChance: 45, targetType: AbilityTarget.singleAlly, unlockedAtLevel: 7),
-      Ability(name: 'Headshot', description: 'A precise shot to the head.', damage: 38, refreshChance: 20, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 11),
+      Ability(name: 'Headshot', description: 'A precise shot to the head. 15% chance to pierce.', damage: 34, refreshChance: 20, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 11),
     ],
   ),
 

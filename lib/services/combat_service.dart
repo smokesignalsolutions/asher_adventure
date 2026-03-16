@@ -154,6 +154,25 @@ class CombatService {
     return result;
   }
 
+  /// Ranger pierce: re-roll damage against another (or same) enemy.
+  /// Returns (log message, pierce target ID, damage dealt).
+  static ({String log, String targetId, int damage}) executePierce(
+      Character attacker, Ability ability, List<Enemy> aliveEnemies) {
+    if (aliveEnemies.isEmpty) return (log: '', targetId: '', damage: 0);
+    final pierceTarget = aliveEnemies[_random.nextInt(aliveEnemies.length)];
+    final offensiveStat = attacker.totalAttack;
+    final (dmg, isCrit) = calculateDamage(
+      offensiveStat, ability.damage, pierceTarget.effectiveDefense,
+      targetVulnerable: pierceTarget.isVulnerable,
+      attackerSpeed: attacker.totalSpeed,
+    );
+    pierceTarget.currentHp = max(0, pierceTarget.currentHp - dmg);
+    var result = 'Arrow pierces to ${pierceTarget.name} for $dmg damage!';
+    if (isCrit) result += ' CRIT!';
+    if (!pierceTarget.isAlive) result += ' ${pierceTarget.name} is defeated!';
+    return (log: result, targetId: pierceTarget.id, damage: dmg);
+  }
+
   /// Dark Pact: sacrifice 15-25% HP, deal 1.5x that to all enemies
   static String executeDarkPact(Character attacker, List<Enemy> aliveEnemies) {
     final sacrificePercent = 0.15 + _random.nextDouble() * 0.10;

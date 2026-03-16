@@ -288,12 +288,43 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       }
     }
 
-    // Build attack lines from HP diffs
+    // Snapshot HP after main attack (before pierce) for line splitting
+    final enemyHpAfterMain = {
+      for (final e in _combat!.enemies) e.id: e.currentHp
+    };
+
+    // Ranger pierce: 15% chance to hit another (or same) enemy
+    String? pierceSourceId;
+    String? pierceTargetId;
+    int pierceDamage = 0;
+    if (char.characterClass == CharacterClass.ranger && ability.damage > 0) {
+      final aliveEnemies = _combat!.enemies.where((e) => e.isAlive).toList();
+      if (aliveEnemies.isNotEmpty && Random().nextInt(100) < 15) {
+        // Determine the "source" for the bounce line
+        if (target is Enemy) {
+          pierceSourceId = target.id;
+        } else {
+          // AOE — pick the first alive enemy as visual source
+          pierceSourceId = aliveEnemies.first.id;
+        }
+        final result = CombatService.executePierce(char, ability, aliveEnemies);
+        log += ' ${result.log}';
+        pierceTargetId = result.targetId;
+        pierceDamage = result.damage;
+      }
+    }
+
+    // Build attack lines from HP diffs (main attack only, using pre-pierce snapshot)
     final isSpell = !ability.isBasicAttack;
     final lines = <_AttackLineData>[];
     for (final e in _combat!.enemies) {
-      final diff = enemyHpBefore[e.id]! - e.currentHp;
+      final diff = enemyHpBefore[e.id]! - enemyHpAfterMain[e.id]!;
       if (diff > 0) lines.add(_AttackLineData(char.id, e.id, diff, false, isSpell));
+    }
+
+    // Add bounce line for pierce (from original target to pierce target)
+    if (pierceTargetId != null && pierceDamage > 0) {
+      lines.add(_AttackLineData(pierceSourceId!, pierceTargetId, pierceDamage, false, false));
     }
     for (final a in _combat!.allies) {
       final diff = a.currentHp - allyHpBefore[a.id]!;
