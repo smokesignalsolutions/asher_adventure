@@ -219,28 +219,40 @@ class CombatService {
 
       final useMagic = magicDamageClasses.contains(attacker.characterClass);
       final offensiveStat = useMagic ? attacker.totalMagic : attacker.totalAttack;
-      final (damage, isCrit) = calculateDamage(
-        offensiveStat, ability.damage, enemyTarget.effectiveDefense,
-        targetVulnerable: enemyTarget.isVulnerable,
-        chaotic: ability.chaotic,
-        damageMultiplier: chainCastMult,
-        attackerSpeed: attacker.totalSpeed,
-      );
-      enemyTarget.currentHp = max(0, enemyTarget.currentHp - damage);
-      logs.add('${attacker.name} uses ${ability.name} on ${enemyTarget.name} for $damage damage!${isCrit ? ' CRIT!' : ''}');
 
-      // Vampiric: heal for 25% of damage dealt
-      if (attacker.equipment[EquipmentSlot.weapon]?.specialEffect == SpecialEffect.vampiric && damage > 0) {
-        final vampHeal = (damage * 0.25).round();
-        attacker.currentHp = min(attacker.totalMaxHp, attacker.currentHp + vampHeal);
-        logs.add('Drains $vampHeal HP!');
+      // Multi-hit: each hit rolls damage separately
+      final hits = ability.hitCount;
+      for (int hit = 0; hit < hits; hit++) {
+        if (!enemyTarget.isAlive) break;
+        final (damage, isCrit) = calculateDamage(
+          offensiveStat, ability.damage, enemyTarget.effectiveDefense,
+          targetVulnerable: enemyTarget.isVulnerable,
+          chaotic: ability.chaotic,
+          damageMultiplier: chainCastMult,
+          attackerSpeed: attacker.totalSpeed,
+        );
+        enemyTarget.currentHp = max(0, enemyTarget.currentHp - damage);
+        if (hits > 1) {
+          logs.add('${attacker.name}\'s ${ability.name} hit ${hit + 1}: $damage damage!${isCrit ? ' CRIT!' : ''}');
+        } else {
+          logs.add('${attacker.name} uses ${ability.name} on ${enemyTarget.name} for $damage damage!${isCrit ? ' CRIT!' : ''}');
+        }
+
+        // Vampiric: heal for 25% of damage dealt (per hit)
+        if (attacker.equipment[EquipmentSlot.weapon]?.specialEffect == SpecialEffect.vampiric && damage > 0) {
+          final vampHeal = (damage * 0.25).round();
+          attacker.currentHp = min(attacker.totalMaxHp, attacker.currentHp + vampHeal);
+          logs.add('Drains $vampHeal HP!');
+        }
+
+        if (ability.lifeDrain) {
+          final healAmount = damage;
+          attacker.currentHp = min(attacker.totalMaxHp, attacker.currentHp + healAmount);
+          logs.add('Drains $healAmount HP!');
+        }
       }
 
-      if (ability.lifeDrain) {
-        final healAmount = damage;
-        attacker.currentHp = min(attacker.totalMaxHp, attacker.currentHp + healAmount);
-        logs.add('Drains $healAmount HP!');
-      }
+      // Debuffs apply once (not per hit)
       if (ability.appliesVulnerability && !enemyTarget.isVulnerable) {
         enemyTarget.isVulnerable = true;
         logs.add('${enemyTarget.name} is weakened!');

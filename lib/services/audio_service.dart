@@ -1,20 +1,38 @@
+import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum MusicTrack {
-  title('audio/music/title_theme.wav'),
-  exploration('audio/music/exploration.wav'),
-  battle('audio/music/battle.wav'),
-  bossBattle('audio/music/boss_battle.wav'),
-  shop('audio/music/shop.wav'),
-  rest('audio/music/rest.wav'),
-  event('audio/music/event.wav'),
-  treasure('audio/music/treasure.wav'),
-  victory('audio/music/victory.wav'),
-  gameOver('audio/music/game_over.wav');
+  title,
+  exploration,
+  battle,
+  bossBattle,
+  shop,
+  rest,
+  event,
+  treasure,
+  victory,
+  gameOver;
 
-  final String assetPath;
-  const MusicTrack(this.assetPath);
+  static final _rng = Random();
+
+  /// Returns a random variant path for this track (1-5).
+  String get assetPath {
+    final variant = _rng.nextInt(5) + 1;
+    final baseName = switch (this) {
+      MusicTrack.title => 'title_theme',
+      MusicTrack.exploration => 'exploration',
+      MusicTrack.battle => 'battle',
+      MusicTrack.bossBattle => 'boss_battle',
+      MusicTrack.shop => 'shop',
+      MusicTrack.rest => 'rest',
+      MusicTrack.event => 'event',
+      MusicTrack.treasure => 'treasure',
+      MusicTrack.victory => 'victory',
+      MusicTrack.gameOver => 'game_over',
+    };
+    return 'audio/music/${baseName}_$variant.wav';
+  }
 }
 
 enum SfxType {
@@ -38,6 +56,7 @@ class AudioService {
   final _sfxPlayer = AudioPlayer();
 
   MusicTrack? _currentTrack;
+  String? _currentPath;
   double _volume = 0.7;
   bool _muted = false;
   bool _initialized = false;
@@ -62,9 +81,12 @@ class AudioService {
     if (track == _currentTrack) return;
     _currentTrack = track;
 
+    // Pick a random variant each time the track type changes
+    _currentPath = track.assetPath;
+
     await _musicPlayer.stop();
     if (!_muted) {
-      await _musicPlayer.setSource(AssetSource(track.assetPath));
+      await _musicPlayer.setSource(AssetSource(_currentPath!));
       await _applyVolume();
       await _musicPlayer.resume();
     }
@@ -94,8 +116,8 @@ class AudioService {
     _muted = !_muted;
     if (_muted) {
       await _musicPlayer.pause();
-    } else if (_currentTrack != null) {
-      await _musicPlayer.setSource(AssetSource(_currentTrack!.assetPath));
+    } else if (_currentPath != null) {
+      await _musicPlayer.setSource(AssetSource(_currentPath!));
       await _applyVolume();
       await _musicPlayer.resume();
     }
@@ -108,8 +130,8 @@ class AudioService {
     _muted = muted;
     if (_muted) {
       await _musicPlayer.pause();
-    } else if (_currentTrack != null) {
-      await _musicPlayer.setSource(AssetSource(_currentTrack!.assetPath));
+    } else if (_currentPath != null) {
+      await _musicPlayer.setSource(AssetSource(_currentPath!));
       await _applyVolume();
       await _musicPlayer.resume();
     }

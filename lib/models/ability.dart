@@ -22,6 +22,7 @@ class Ability {
   final int debuffDuration; // turns the temp debuff lasts
   final bool chaotic; // wider variance (-25% to +25%) + 50% chance to bounce
   final int stunChance; // 0-100% chance to stun enemy (skip next turn)
+  final int hitCount; // number of times this ability hits (each hit rolls separately)
   bool isAvailable;
 
   Ability({
@@ -46,6 +47,7 @@ class Ability {
     this.debuffDuration = 0,
     this.chaotic = false,
     this.stunChance = 0,
+    this.hitCount = 1,
     this.isAvailable = true,
   });
 
@@ -72,6 +74,7 @@ class Ability {
       debuffDuration: debuffDuration,
       chaotic: chaotic,
       stunChance: stunChance,
+      hitCount: hitCount,
       isAvailable: isAvailable ?? this.isAvailable,
     );
   }
@@ -99,6 +102,7 @@ class Ability {
     'debuffDuration': debuffDuration,
     'chaotic': chaotic,
     'stunChance': stunChance,
+    'hitCount': hitCount,
   };
 
   factory Ability.fromJson(Map<String, dynamic> json) => Ability(
@@ -123,6 +127,7 @@ class Ability {
     debuffDuration: json['debuffDuration'] ?? 0,
     chaotic: json['chaotic'] ?? false,
     stunChance: json['stunChance'] ?? 0,
+    hitCount: json['hitCount'] ?? 1,
     isAvailable: json['isAvailable'] ?? true,
   );
 }

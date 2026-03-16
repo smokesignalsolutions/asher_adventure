@@ -1084,7 +1084,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                     label: 'Potion (${ref.read(gameStateProvider)!.healthPotions})',
                     iconWidget: Icon(
                       Icons.local_drink,
-                      size: 80,
+                      size: 96,
                       color: _potionMode
                           ? theme.colorScheme.onTertiary
                           : Colors.red.shade400,
@@ -1121,8 +1121,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                     keyNumber: index < 5 ? index + 1 : null,
                     iconWidget: Image.asset(
                       abilityIconPath(ability.name),
-                      width: 96,
-                      height: 96,
+                      width: 128,
+                      height: 128,
                       filterQuality: FilterQuality.none,
                       errorBuilder: (context, error, stackTrace) =>
                           Icon(
@@ -1270,8 +1270,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
               ),
               const SizedBox(height: 4),
               SizedBox(
-                width: 120,
-                height: 120,
+                width: 128,
+                height: 128,
                 child: FittedBox(
                   fit: BoxFit.contain,
                   child: iconWidget,
