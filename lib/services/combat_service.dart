@@ -22,6 +22,8 @@ class CombatService {
       char.combatAttackMultiplier = 1.0;
       char.combatDefenseMultiplier = 1.0;
       char.combatDefenseBonus = 0;
+      char.activeSummons = [];
+      char.lastAttackWasPhysical = null;
     }
 
     final turnOrder = buildGroupedTurnOrder(party, enemies);
@@ -283,12 +285,35 @@ class CombatService {
       // --- SUPPORTIVE: heal + optional buffs ---
       final Character charTarget = target as Character;
 
+      // Summon handling: add summon to caster's active list
+      if (ability.summonId.isNotEmpty) {
+        if (!attacker.activeSummons.contains(ability.summonId)) {
+          attacker.activeSummons.add(ability.summonId);
+        }
+        logs.add('${attacker.name} summons a ${ability.summonId}!');
+      }
+
       // Heal
       if (ability.damage < 0) {
         final healStat = ability.healScalesWithDefense ? attacker.totalDefense : attacker.totalMagic;
         final (healAmount, healCrit) = calculateHealing(healStat, ability.damage, healingMultiplier: healingMultiplier, casterSpeed: attacker.totalSpeed);
+        final hpBefore = charTarget.currentHp;
         charTarget.currentHp = min(charTarget.totalMaxHp, charTarget.currentHp + healAmount);
         logs.add('${attacker.name} uses ${ability.name} on ${charTarget.name} for $healAmount healing!${healCrit ? ' CRIT!' : ''}');
+
+        // Cleric overheal → shield (excess becomes shield, max 50% of target maxHp)
+        if (attacker.characterClass == CharacterClass.cleric) {
+          final actualHealed = charTarget.currentHp - hpBefore;
+          final overheal = healAmount - actualHealed;
+          if (overheal > 0) {
+            final shieldCap = charTarget.totalMaxHp ~/ 2;
+            final shieldGain = min(overheal, shieldCap - charTarget.shieldHp);
+            if (shieldGain > 0) {
+              charTarget.shieldHp += shieldGain;
+              logs.add('${charTarget.name} gains $shieldGain shield from overheal!');
+            }
+          }
+        }
       } else if (ability.healPercentMaxHp > 0) {
         final healAmount = (charTarget.totalMaxHp * ability.healPercentMaxHp / 100 * healingMultiplier).round();
         charTarget.currentHp = min(charTarget.totalMaxHp, charTarget.currentHp + healAmount);
@@ -314,6 +339,88 @@ class CombatService {
     }
 
     return logs.join(' ');
+  }
+
+  /// Check if any ally has an active golem summon (15% party damage reduction)
+  static bool _hasGolemSummon(List<Character> allies) {
+    return allies.any((a) => a.isAlive && a.activeSummons.contains('golem'));
+  }
+
+  /// Apply Paladin DR and Golem summon DR to incoming damage
+  static (int, List<String>) _applyDefensivePassives(int damage, Character ally, List<Character> allAllies) {
+    final logs = <String>[];
+    // Golem summon: party takes 15% less damage
+    if (_hasGolemSummon(allAllies)) {
+      damage = (damage * 0.85).round();
+    }
+    // Paladin: 25% DR when below 50% HP
+    if (ally.characterClass == CharacterClass.paladin && ally.currentHp < ally.totalMaxHp / 2) {
+      damage = (damage * 0.75).round();
+      logs.add('${ally.name}\'s divine resolve reduces damage!');
+    }
+    return (max(1, damage), logs);
+  }
+
+  /// Fighter counter-attack: 15% chance when hit
+  static List<String> _tryFighterCounter(Character ally, Enemy enemy) {
+    if (ally.characterClass != CharacterClass.fighter || !ally.isAlive) return [];
+    if (_random.nextInt(100) >= 15) return [];
+    final basicAbility = ally.abilities.firstWhere((a) => a.isBasicAttack, orElse: () => ally.abilities.first);
+    final (counterDmg, counterCrit) = calculateDamage(ally.totalAttack, basicAbility.damage, enemy.effectiveDefense, attackerSpeed: ally.totalSpeed);
+    enemy.currentHp = max(0, enemy.currentHp - counterDmg);
+    var log = '${ally.name} counter-attacks for $counterDmg damage!${counterCrit ? ' CRIT!' : ''}';
+    if (!enemy.isAlive) log += ' ${enemy.name} is defeated!';
+    return [log];
+  }
+
+  /// Summoner: process persistent summon effects at start of turn
+  static List<String> processSummonEffects(Character summoner, List<Enemy> enemies, List<Character> allies) {
+    final logs = <String>[];
+    final aliveEnemies = enemies.where((e) => e.isAlive).toList();
+    final aliveAllies = allies.where((a) => a.isAlive).toList();
+
+    for (final summon in summoner.activeSummons) {
+      switch (summon) {
+        case 'wolf':
+          if (aliveEnemies.isNotEmpty) {
+            final target = aliveEnemies[_random.nextInt(aliveEnemies.length)];
+            final dmg = 8 + summoner.totalMagic ~/ 3;
+            target.currentHp = max(0, target.currentHp - dmg);
+            logs.add('Wolf spirit attacks ${target.name} for $dmg damage!');
+            if (!target.isAlive) logs.add('${target.name} is defeated!');
+          }
+        case 'fairy':
+          if (aliveAllies.isNotEmpty) {
+            final injured = aliveAllies.reduce((a, b) =>
+              (a.currentHp / a.totalMaxHp) < (b.currentHp / b.totalMaxHp) ? a : b);
+            if (injured.currentHp < injured.totalMaxHp) {
+              final heal = 5 + summoner.totalMagic ~/ 4;
+              injured.currentHp = min(injured.totalMaxHp, injured.currentHp + heal);
+              logs.add('Fairy heals ${injured.name} for $heal HP!');
+            }
+          }
+        case 'shadow':
+          for (final e in aliveEnemies) {
+            e.attackMultiplier = max(0.5, e.attackMultiplier - 0.10);
+          }
+          if (aliveEnemies.isNotEmpty) {
+            logs.add('Shadow weakens all enemies\' attack by 10%!');
+          }
+        case 'swarm':
+          final dmg = 4 + summoner.totalMagic ~/ 4;
+          for (final e in aliveEnemies) {
+            e.currentHp = max(0, e.currentHp - dmg);
+          }
+          if (aliveEnemies.isNotEmpty) {
+            logs.add('Swarm damages all enemies for $dmg each!');
+            for (final e in aliveEnemies) {
+              if (!e.isAlive) logs.add('${e.name} is defeated!');
+            }
+          }
+        // 'golem' is passive - handled in _applyDefensivePassives
+      }
+    }
+    return logs;
   }
 
   /// Enemy AI: pick a random alive ally to attack with basic attack
@@ -354,6 +461,10 @@ class CombatService {
       // Hit all allies
       for (final ally in aliveAllies) {
         var (damage, isCrit) = calculateDamage(enemy.effectiveAttack, ability.damage, ally.totalDefense, damageMultiplier: enemyDamageMultiplier, attackerSpeed: enemy.speed);
+        // Defensive passives (Paladin DR, Golem summon)
+        final (reducedDmg, drLogs) = _applyDefensivePassives(damage, ally, allies);
+        damage = reducedDmg;
+        logs.addAll(drLogs);
         var log = '${ally.name} takes $damage damage${isCrit ? ' (CRIT!)' : ''}';
         // Shield absorbs damage first
         if (ally.shieldHp > 0) {
@@ -376,6 +487,8 @@ class CombatService {
         }
 
         if (!ally.isAlive) logs.add('${ally.name} falls!');
+        // Fighter counter-attack
+        if (ally.isAlive && enemy.isAlive) logs.addAll(_tryFighterCounter(ally, enemy));
       }
       if (!ability.isBasicAttack) ability.isAvailable = false;
       return [if (logs.isNotEmpty) ...logs, '${enemy.name} uses ${ability.name}!'].join(' ');
@@ -385,6 +498,10 @@ class CombatService {
     final target = aliveAllies[_random.nextInt(aliveAllies.length)];
     var (damage, isCrit) = calculateDamage(enemy.effectiveAttack, ability.damage, target.totalDefense, damageMultiplier: enemyDamageMultiplier, attackerSpeed: enemy.speed);
     if (!ability.isBasicAttack) ability.isAvailable = false;
+    // Defensive passives (Paladin DR, Golem summon)
+    final (reducedDmg, drLogs) = _applyDefensivePassives(damage, target, allies);
+    damage = reducedDmg;
+    logs.addAll(drLogs);
     var log = '${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!${isCrit ? ' CRIT!' : ''}';
     // Shield absorbs damage first
     if (target.shieldHp > 0) {
@@ -407,6 +524,8 @@ class CombatService {
     }
 
     if (!target.isAlive) logs.add('${target.name} falls!');
+    // Fighter counter-attack
+    if (target.isAlive && enemy.isAlive) logs.addAll(_tryFighterCounter(target, enemy));
     return logs.join(' ');
   }
 }

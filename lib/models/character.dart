@@ -52,6 +52,8 @@ class Character {
   double combatAttackMultiplier; // combat-only, resets each fight
   double combatDefenseMultiplier; // combat-only, resets each fight
   int combatDefenseBonus; // flat defense bonus from abilities like Holy Guard
+  List<String> activeSummons; // summoner: persistent summon IDs (combat-only)
+  bool? lastAttackWasPhysical; // spellsword: track alternation (combat-only)
 
   Character({
     required this.id,
@@ -71,17 +73,27 @@ class Character {
     this.combatAttackMultiplier = 1.0,
     this.combatDefenseMultiplier = 1.0,
     this.combatDefenseBonus = 0,
+    List<String>? activeSummons,
+    this.lastAttackWasPhysical,
   }) : equipment = equipment ?? {
          for (var slot in EquipmentSlot.values) slot: null,
        },
-       abilities = abilities ?? [];
+       abilities = abilities ?? [],
+       activeSummons = activeSummons ?? [];
 
   bool get isAlive => currentHp > 0;
 
-  int get totalAttack =>
-      ((attack +
+  int get totalAttack {
+    var base = ((attack +
       equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.attackBonus)) *
       combatAttackMultiplier).round();
+    // Barbarian: gains up to +50% base attack as HP drops
+    if (characterClass == CharacterClass.barbarian && currentHp < totalMaxHp) {
+      final missingRatio = 1 - (currentHp / totalMaxHp);
+      base += (attack * missingRatio * 0.5).round();
+    }
+    return base;
+  }
 
   int get totalDefense =>
       ((defense + combatDefenseBonus +

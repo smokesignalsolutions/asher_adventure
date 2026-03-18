@@ -10,9 +10,36 @@ import '../../../providers/player_profile_provider.dart';
 class LegacyHallScreen extends ConsumerWidget {
   const LegacyHallScreen({super.key});
 
-  static const _classUnlockCosts = [
-    50, 75, 100, 150, 200, 250, 300, 350, 400, 500, 600, 750,
-  ];
+  /// Cost for the next class unlock: 50, 75, 100, 125, ...
+  /// Based on how many non-starter classes the player already owns.
+  static int _nextClassCost(PlayerProfile profile) {
+    final bought = profile.unlockedClasses
+        .where((cls) => !PlayerProfile.starterClasses.contains(cls))
+        .length;
+    return 50 + bought * 25;
+  }
+
+  /// Total passive ranks + perks the player has purchased.
+  static int _totalPassiveAndPerkPurchases(PlayerProfile profile) {
+    final ranks = profile.passiveBonuses.values.fold(0, (sum, rank) => sum + rank);
+    final perks = profile.unlockedPerks.length;
+    return ranks + perks;
+  }
+
+  /// Scaled cost for a passive or perk: base cost * 1.1^(total purchases).
+  static int _scaledCost(int baseCost, PlayerProfile profile) {
+    final purchases = _totalPassiveAndPerkPurchases(profile);
+    if (purchases == 0) return baseCost;
+    return (baseCost * _pow(1.1, purchases)).round();
+  }
+
+  static double _pow(double base, int exp) {
+    double result = 1.0;
+    for (int i = 0; i < exp; i++) {
+      result *= base;
+    }
+    return result;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -97,7 +124,7 @@ class LegacyHallScreen extends ConsumerWidget {
         final cls = unlockableClasses[index];
         final def = classDefinitions[cls]!;
         final isOwned = profile.unlockedClasses.contains(cls);
-        final cost = _classUnlockCosts[index];
+        final cost = _nextClassCost(profile);
         final canAfford = profile.legacyPoints >= cost;
 
         return Card(
@@ -171,7 +198,8 @@ class LegacyHallScreen extends ConsumerWidget {
         final bonus = passiveBonuses[index];
         final currentRank = profile.passiveBonuses[bonus.id] ?? 0;
         final isMaxed = currentRank >= bonus.maxRanks;
-        final canAfford = profile.legacyPoints >= bonus.costPerRank;
+        final cost = _scaledCost(bonus.costPerRank, profile);
+        final canAfford = profile.legacyPoints >= cost;
 
         return Card(
           child: ListTile(
@@ -189,7 +217,7 @@ class LegacyHallScreen extends ConsumerWidget {
                           fontWeight: FontWeight.bold,
                         )),
                     if (!isMaxed)
-                      Text('${bonus.costPerRank} LP',
+                      Text('$cost LP',
                           style: theme.textTheme.bodySmall),
                   ],
                 ),
@@ -199,7 +227,7 @@ class LegacyHallScreen extends ConsumerWidget {
                       ? () => ref
                           .read(playerProfileProvider.notifier)
                           .purchasePassiveBonus(
-                              bonus.id, bonus.costPerRank, bonus.maxRanks)
+                              bonus.id, cost, bonus.maxRanks)
                       : null,
                   child: Text(isMaxed ? 'MAX' : 'Buy'),
                 ),
@@ -223,7 +251,8 @@ class LegacyHallScreen extends ConsumerWidget {
       itemBuilder: (context, index) {
         final perk = startingPerks[index];
         final isOwned = profile.unlockedPerks.contains(perk.id);
-        final canAfford = profile.legacyPoints >= perk.cost;
+        final cost = _scaledCost(perk.cost, profile);
+        final canAfford = profile.legacyPoints >= cost;
 
         return Card(
           child: ListTile(
@@ -246,7 +275,7 @@ class LegacyHallScreen extends ConsumerWidget {
                 : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('${perk.cost} LP',
+                      Text('$cost LP',
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           )),
@@ -255,7 +284,7 @@ class LegacyHallScreen extends ConsumerWidget {
                         onPressed: canAfford
                             ? () => ref
                                 .read(playerProfileProvider.notifier)
-                                .purchasePerk(perk.id, perk.cost)
+                                .purchasePerk(perk.id, cost)
                             : null,
                         child: const Text('Buy'),
                       ),

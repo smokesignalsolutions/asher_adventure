@@ -23,6 +23,10 @@ class Ability {
   final bool chaotic; // wider variance (-25% to +25%) + 50% chance to bounce
   final int stunChance; // 0-100% chance to stun enemy (skip next turn)
   final int hitCount; // number of times this ability hits (each hit rolls separately)
+  final int minTargets; // random multi-target: min targets (0 = not used)
+  final int maxTargets; // random multi-target: max targets
+  final String summonId; // persistent summon identifier (summoner class)
+  final bool isPhysicalAttack; // for spellsword alternating bonus
   bool isAvailable;
 
   Ability({
@@ -48,6 +52,10 @@ class Ability {
     this.chaotic = false,
     this.stunChance = 0,
     this.hitCount = 1,
+    this.minTargets = 0,
+    this.maxTargets = 0,
+    this.summonId = '',
+    this.isPhysicalAttack = false,
     this.isAvailable = true,
   });
 
@@ -75,6 +83,10 @@ class Ability {
       chaotic: chaotic,
       stunChance: stunChance,
       hitCount: hitCount,
+      minTargets: minTargets,
+      maxTargets: maxTargets,
+      summonId: summonId,
+      isPhysicalAttack: isPhysicalAttack,
       isAvailable: isAvailable ?? this.isAvailable,
     );
   }
@@ -103,6 +115,10 @@ class Ability {
     'chaotic': chaotic,
     'stunChance': stunChance,
     'hitCount': hitCount,
+    'minTargets': minTargets,
+    'maxTargets': maxTargets,
+    'summonId': summonId,
+    'isPhysicalAttack': isPhysicalAttack,
   };
 
   factory Ability.fromJson(Map<String, dynamic> json) => Ability(
@@ -128,6 +144,10 @@ class Ability {
     chaotic: json['chaotic'] ?? false,
     stunChance: json['stunChance'] ?? 0,
     hitCount: json['hitCount'] ?? 1,
+    minTargets: json['minTargets'] ?? 0,
+    maxTargets: json['maxTargets'] ?? 0,
+    summonId: json['summonId'] ?? '',
+    isPhysicalAttack: json['isPhysicalAttack'] ?? false,
     isAvailable: json['isAvailable'] ?? true,
   );
 }

@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/codex_data.dart';
@@ -29,11 +30,27 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
   Equipment? _loot;
   int _goldFound = 0;
   bool _equipped = false;
+  final _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _generateLoot();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleKeyPress(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+    if (event.logicalKey == LogicalKeyboardKey.space ||
+        event.logicalKey == LogicalKeyboardKey.keyC) {
+      ref.read(gameStateProvider.notifier).completeCombat(0, _goldFound);
+      context.go('/map');
+    }
   }
 
   void _generateLoot() {
@@ -107,7 +124,11 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
 
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return KeyboardListener(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyPress,
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Treasure!'),
         actions: const [HelpButton(), AudioMuteButton()],
@@ -209,6 +230,7 @@ class _TreasureScreenState extends ConsumerState<TreasureScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 

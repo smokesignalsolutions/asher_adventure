@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/mutator_data.dart';
@@ -7,11 +8,37 @@ import '../../../providers/game_state_provider.dart';
 import '../../widgets/audio_controls.dart';
 import '../../widgets/help_button.dart';
 
-class RestScreen extends ConsumerWidget {
+class RestScreen extends ConsumerStatefulWidget {
   const RestScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RestScreen> createState() => _RestScreenState();
+}
+
+class _RestScreenState extends ConsumerState<RestScreen> {
+  final _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleKeyPress(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+    if (event.logicalKey == LogicalKeyboardKey.space ||
+        event.logicalKey == LogicalKeyboardKey.keyC) {
+      final gameState = ref.read(gameStateProvider);
+      if (gameState == null) return;
+      final mutatorHeal = getMutatorEffect(gameState.activeMutator, 'rest_heal');
+      final healFraction = mutatorHeal < 1.0 ? mutatorHeal : 0.6;
+      ref.read(gameStateProvider.notifier).restParty(healFraction: healFraction);
+      context.go('/map');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final gameState = ref.watch(gameStateProvider);
     if (gameState == null) {
       return const Scaffold(body: Center(child: Text('No game state')));
@@ -23,7 +50,11 @@ class RestScreen extends ConsumerWidget {
     final isPartialHeal = healFraction < 1.0;
     final healPercent = (healFraction * 100).round();
 
-    return Scaffold(
+    return KeyboardListener(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyPress,
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Rest Stop'),
         actions: const [HelpButton(), AudioMuteButton()],
@@ -107,6 +138,7 @@ class RestScreen extends ConsumerWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

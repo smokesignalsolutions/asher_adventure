@@ -148,6 +148,16 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         _advanceTurn();
         return;
       }
+      // Summoner: process persistent summon effects at start of turn
+      if (char.activeSummons.isNotEmpty) {
+        final summonLogs = CombatService.processSummonEffects(char, _combat!.enemies, _combat!.allies);
+        if (summonLogs.isNotEmpty) {
+          setState(() {
+            _combat!.combatLog.addAll(summonLogs);
+          });
+          _scrollLog();
+        }
+      }
       setState(() {
         _waitingForInput = true;
         _selectedAbility = null;
@@ -256,6 +266,17 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       for (final a in _combat!.allies) a.id: a.currentHp
     };
 
+    // Spellsword: alternating physical/magic bonus (+30%)
+    bool spellswordBoosted = false;
+    if (char.characterClass == CharacterClass.spellsword && ability.damage > 0) {
+      final isPhysical = ability.isPhysicalAttack;
+      if (char.lastAttackWasPhysical != null && char.lastAttackWasPhysical != isPhysical) {
+        char.combatAttackMultiplier += 0.30;
+        spellswordBoosted = true;
+      }
+      char.lastAttackWasPhysical = isPhysical;
+    }
+
     String log;
     if (ability.darkPact) {
       // Dark Pact: special handling - sacrifice HP, damage all enemies
@@ -263,6 +284,23 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       log = CombatService.executeDarkPact(
         char, _combat!.enemies.where((e) => e.isAlive).toList(),
       );
+    } else if (ability.minTargets > 0) {
+      // Wizard multi-target: hit random enemies (can repeat targets)
+      final aliveEnemies = _combat!.enemies.where((e) => e.isAlive).toList();
+      final targetCount = ability.minTargets + Random().nextInt(ability.maxTargets - ability.minTargets + 1);
+      final hits = targetCount.clamp(1, aliveEnemies.isEmpty ? 1 : targetCount);
+      final logs = <String>[];
+      for (int i = 0; i < hits && aliveEnemies.isNotEmpty; i++) {
+        final alive = _combat!.enemies.where((e) => e.isAlive).toList();
+        if (alive.isEmpty) break;
+        final randomTarget = alive[Random().nextInt(alive.length)];
+        logs.add(CombatService.executeAllyTurn(char, ability, randomTarget, healingMultiplier: _healingMultiplier));
+        // Only mark unavailable once (first iteration)
+        if (i == 0 && !ability.isBasicAttack) {
+          // already handled by executeAllyTurn
+        }
+      }
+      log = logs.join(' ');
     } else if (ability.targetType == AbilityTarget.allEnemies) {
       final logs = <String>[];
       for (final enemy in _combat!.enemies.where((e) => e.isAlive)) {
@@ -277,6 +315,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       log = logs.join(' ');
     } else {
       log = CombatService.executeAllyTurn(char, ability, target, healingMultiplier: _healingMultiplier);
+    }
+
+    // Revert spellsword boost
+    if (spellswordBoosted) {
+      char.combatAttackMultiplier -= 0.30;
     }
 
     // Chaotic bounce: 50% chance to hit another random enemy
@@ -311,6 +354,32 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         log += ' ${result.log}';
         pierceTargetId = result.targetId;
         pierceDamage = result.damage;
+      }
+    }
+
+    // Templar: attack abilities heal most injured ally for 15% of damage dealt
+    if (char.characterClass == CharacterClass.templar && ability.damage > 0) {
+      int totalDmg = 0;
+      for (final e in _combat!.enemies) {
+        totalDmg += enemyHpBefore[e.id]! - e.currentHp;
+      }
+      if (totalDmg > 0) {
+        final aliveAllies = _combat!.allies.where((a) => a.isAlive).toList();
+        if (aliveAllies.isNotEmpty) {
+          final injured = aliveAllies.reduce((a, b) =>
+            (a.currentHp / a.totalMaxHp) < (b.currentHp / b.totalMaxHp) ? a : b);
+          final healAmt = max(1, (totalDmg * 0.15).round());
+          injured.currentHp = min(injured.totalMaxHp, injured.currentHp + healAmt);
+          log += ' ${injured.name} is healed for $healAmt by holy light!';
+        }
+      }
+    }
+
+    // Artificer: 35% chance to preserve ability (not consume refresh)
+    if (char.characterClass == CharacterClass.artificer && !ability.isBasicAttack && !ability.isAvailable) {
+      if (Random().nextInt(100) < 35) {
+        ability.isAvailable = true;
+        log += ' ${char.name}\'s ingenuity preserves ${ability.name}!';
       }
     }
 

@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/codex_data.dart';
@@ -353,11 +354,27 @@ class EventScreen extends ConsumerStatefulWidget {
 class _EventScreenState extends ConsumerState<EventScreen> {
   late _GameEvent _event;
   String? _result;
+  final _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _event = _events[Random().nextInt(_events.length)];
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleKeyPress(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+    if (_result == null) return;
+    if (event.logicalKey == LogicalKeyboardKey.space ||
+        event.logicalKey == LogicalKeyboardKey.keyC) {
+      context.go('/map');
+    }
   }
 
   void _choose(_EventChoice choice) {
@@ -427,7 +444,11 @@ class _EventScreenState extends ConsumerState<EventScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
+    return KeyboardListener(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyPress,
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Event'),
         actions: const [HelpButton(), AudioMuteButton()],
@@ -485,6 +506,7 @@ class _EventScreenState extends ConsumerState<EventScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }
