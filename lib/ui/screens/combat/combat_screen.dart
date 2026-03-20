@@ -285,20 +285,20 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         char, _combat!.enemies.where((e) => e.isAlive).toList(),
       );
     } else if (ability.minTargets > 0) {
-      // Wizard multi-target: hit random enemies (can repeat targets)
+      // Multi-target: if alive <= minTargets, hit all; otherwise pick random unique targets
       final aliveEnemies = _combat!.enemies.where((e) => e.isAlive).toList();
-      final targetCount = ability.minTargets + Random().nextInt(ability.maxTargets - ability.minTargets + 1);
-      final hits = targetCount.clamp(1, aliveEnemies.isEmpty ? 1 : targetCount);
+      final List<Enemy> targets;
+      if (aliveEnemies.length <= ability.minTargets) {
+        targets = List.of(aliveEnemies);
+      } else {
+        final count = ability.minTargets + Random().nextInt(ability.maxTargets - ability.minTargets + 1);
+        final shuffled = List.of(aliveEnemies)..shuffle();
+        targets = shuffled.take(count.clamp(1, aliveEnemies.length)).toList();
+      }
       final logs = <String>[];
-      for (int i = 0; i < hits && aliveEnemies.isNotEmpty; i++) {
-        final alive = _combat!.enemies.where((e) => e.isAlive).toList();
-        if (alive.isEmpty) break;
-        final randomTarget = alive[Random().nextInt(alive.length)];
-        logs.add(CombatService.executeAllyTurn(char, ability, randomTarget, healingMultiplier: _healingMultiplier));
-        // Only mark unavailable once (first iteration)
-        if (i == 0 && !ability.isBasicAttack) {
-          // already handled by executeAllyTurn
-        }
+      for (final enemy in targets) {
+        if (!enemy.isAlive) continue;
+        logs.add(CombatService.executeAllyTurn(char, ability, enemy, healingMultiplier: _healingMultiplier));
       }
       log = logs.join(' ');
     } else if (ability.targetType == AbilityTarget.allEnemies) {
@@ -551,6 +551,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       _useAbility(ability, char);
     } else if (ability.targetType == AbilityTarget.allEnemies ||
         ability.targetType == AbilityTarget.allAllies) {
+      _useAbility(ability, null);
+    } else if (ability.minTargets > 0) {
+      // Multi-target spells auto-fire (no target selection needed)
       _useAbility(ability, null);
     } else if (ability.targetType == AbilityTarget.singleEnemy) {
       final alive = _combat!.enemies.where((e) => e.isAlive).toList();
@@ -1221,6 +1224,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                                     AbilityTarget.allEnemies ||
                                 ability.targetType ==
                                     AbilityTarget.allAllies) {
+                              _useAbility(ability, null);
+                            } else if (ability.minTargets > 0) {
                               _useAbility(ability, null);
                             } else if (ability.targetType ==
                                 AbilityTarget.singleEnemy) {
