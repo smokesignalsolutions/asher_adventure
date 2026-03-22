@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../data/class_data.dart';
 import '../../../data/map_backgrounds.dart';
 import '../../../data/mutator_data.dart';
 import '../../../models/enums.dart';
@@ -107,43 +108,42 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ),
       body: Column(
         children: [
-          // Compact party HP bar with front/back line toggle
+          // Compact party HP bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: Row(
               children: gameState.party.map((c) {
+                final isFront = !magicDamageClasses.contains(c.characterClass);
                 return Expanded(
-                  child: GestureDetector(
-                    onTap: () => ref.read(gameStateProvider.notifier).toggleFrontLine(c.id),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Column(
-                          children: [
-                            Text(
-                              c.name.split(' ').first,
-                              style: theme.textTheme.bodySmall?.copyWith(
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Column(
+                        children: [
+                          Text(
+                            c.name.split(' ').first,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: isFront
+                                  ? Colors.orange.withValues(alpha: 0.3)
+                                  : Colors.blue.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              isFront ? 'Front' : 'Back',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontSize: 9,
+                                color: isFront ? Colors.orange[300] : Colors.blue[300],
                                 fontWeight: FontWeight.bold,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: c.isFrontLine
-                                    ? Colors.orange.withValues(alpha: 0.3)
-                                    : Colors.blue.withValues(alpha: 0.3),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                c.isFrontLine ? 'Front' : 'Back',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  fontSize: 9,
-                                  color: c.isFrontLine ? Colors.orange[300] : Colors.blue[300],
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                          ),
                             Text(
                               'Lv ${c.level}',
                               style: theme.textTheme.labelSmall?.copyWith(
@@ -189,8 +189,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         ),
                       ),
                     ),
-                  ),
-                );
+                  );
               }).toList(),
             ),
           ),

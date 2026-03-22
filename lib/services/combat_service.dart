@@ -5,6 +5,7 @@ import '../models/character.dart';
 import '../models/combat_state.dart';
 import '../models/enemy.dart';
 import '../models/enums.dart';
+import '../models/summon_effect.dart';
 
 class CombatService {
   static final _random = Random();
@@ -17,13 +18,15 @@ class CombatService {
   }
 
   static CombatState initCombat(List<Character> party, List<Enemy> enemies) {
-    // Reset combat-only buffs
+    // Reset combat-only buffs & auto-assign front/back line by class
     for (final char in party) {
       char.combatAttackMultiplier = 1.0;
       char.combatDefenseMultiplier = 1.0;
       char.combatDefenseBonus = 0;
       char.activeSummons = [];
       char.lastAttackWasPhysical = null;
+      char.isFrontLine = !magicDamageClasses.contains(char.characterClass);
+      char.skeletonCount = 0;
     }
 
     final turnOrder = buildGroupedTurnOrder(party, enemies);
@@ -303,9 +306,13 @@ class CombatService {
       }
 
       final useMagic = magicDamageClasses.contains(attacker.characterClass);
-      final offensiveStat = useMagic
-          ? attacker.totalMagic
-          : attacker.totalAttack;
+      final int offensiveStat;
+      if (attacker.characterClass == CharacterClass.artificer) {
+        // Artificer uses whichever is higher
+        offensiveStat = max(attacker.totalAttack, attacker.totalMagic);
+      } else {
+        offensiveStat = useMagic ? attacker.totalMagic : attacker.totalAttack;
+      }
 
       // Multi-hit: each hit rolls damage separately
       final hits = ability.hitCount;
@@ -364,6 +371,18 @@ class CombatService {
             logs.add('Holy fervor heals ${attacker.name} for $templarHeal!');
           }
         }
+
+        // Warlock passive: drain 25% of damage dealt as HP
+        if (attacker.characterClass == CharacterClass.warlock && damage > 0) {
+          final drainHeal = (damage * 0.25).round();
+          if (drainHeal > 0) {
+            attacker.currentHp = min(
+              attacker.totalMaxHp,
+              attacker.currentHp + drainHeal,
+            );
+            logs.add('Dark siphon drains $drainHeal HP!');
+          }
+        }
       }
 
       // Debuffs apply once (not per hit)
@@ -408,12 +427,16 @@ class CombatService {
       // --- SUPPORTIVE: heal + optional buffs ---
       final Character charTarget = target as Character;
 
-      // Summon handling: add summon to caster's active list
+      // Summon handling
       if (ability.summonId.isNotEmpty) {
-        if (!attacker.activeSummons.contains(ability.summonId)) {
+        if (ability.summonId == 'skeleton') {
+          // Necromancer: skeletons stack
+          attacker.skeletonCount++;
+          logs.add('${attacker.name} raises a skeleton! (${attacker.skeletonCount} active)');
+        } else if (!attacker.activeSummons.contains(ability.summonId)) {
           attacker.activeSummons.add(ability.summonId);
+          logs.add('${attacker.name} summons a ${ability.summonId}!');
         }
-        logs.add('${attacker.name} summons a ${ability.summonId}!');
       }
 
       // Heal
@@ -538,12 +561,12 @@ class CombatService {
   }
 
   /// Summoner: process persistent summon effects at start of turn
-  static List<String> processSummonEffects(
+  static List<SummonEffect> processSummonEffects(
     Character summoner,
     List<Enemy> enemies,
     List<Character> allies,
   ) {
-    final logs = <String>[];
+    final effects = <SummonEffect>[];
     final aliveEnemies = enemies.where((e) => e.isAlive).toList();
     final aliveAllies = allies.where((a) => a.isAlive).toList();
 
@@ -554,8 +577,24 @@ class CombatService {
             final target = aliveEnemies[_random.nextInt(aliveEnemies.length)];
             final dmg = 8 + summoner.totalMagic ~/ 3;
             target.currentHp = max(0, target.currentHp - dmg);
-            logs.add('Wolf spirit attacks ${target.name} for $dmg damage!');
-            if (!target.isAlive) logs.add('${target.name} is defeated!');
+            var log = 'Wolf spirit attacks ${target.name} for $dmg damage!';
+            if (!target.isAlive) log += ' ${target.name} is defeated!';
+            effects.add(SummonEffect(
+              type: SummonEffectType.wolfAttack,
+              summonerId: summoner.id,
+              targetId: target.id,
+              amount: dmg,
+              logMessage: log,
+            ));
+          }
+        case 'golem':
+          if (aliveAllies.isNotEmpty) {
+            effects.add(SummonEffect(
+              type: SummonEffectType.golemShield,
+              summonerId: summoner.id,
+              targetIds: aliveAllies.map((a) => a.id).toList(),
+              logMessage: 'Golem raises a protective barrier!',
+            ));
           }
         case 'fairy':
           if (aliveAllies.isNotEmpty) {
@@ -571,31 +610,63 @@ class CombatService {
                 injured.totalMaxHp,
                 injured.currentHp + heal,
               );
-              logs.add('Fairy heals ${injured.name} for $heal HP!');
+              effects.add(SummonEffect(
+                type: SummonEffectType.fairyHeal,
+                summonerId: summoner.id,
+                targetId: injured.id,
+                amount: heal,
+                logMessage: 'Fairy heals ${injured.name} for $heal HP!',
+              ));
             }
           }
         case 'shadow':
-          for (final e in aliveEnemies) {
-            e.attackMultiplier = max(0.5, e.attackMultiplier - 0.10);
-          }
           if (aliveEnemies.isNotEmpty) {
-            logs.add('Shadow weakens all enemies\' attack by 10%!');
-          }
-        case 'swarm':
-          final dmg = 4 + summoner.totalMagic ~/ 4;
-          for (final e in aliveEnemies) {
-            e.currentHp = max(0, e.currentHp - dmg);
-          }
-          if (aliveEnemies.isNotEmpty) {
-            logs.add('Swarm damages all enemies for $dmg each!');
+            final dmg = 2 + summoner.totalMagic ~/ 6;
             for (final e in aliveEnemies) {
-              if (!e.isAlive) logs.add('${e.name} is defeated!');
+              e.attackMultiplier = max(0.5, e.attackMultiplier - 0.10);
+              e.currentHp = max(0, e.currentHp - dmg);
             }
+            final defeated = aliveEnemies.where((e) => !e.isAlive).toList();
+            var log = 'Shadow weakens enemies and deals $dmg damage!';
+            for (final e in defeated) {
+              log += ' ${e.name} is defeated!';
+            }
+            effects.add(SummonEffect(
+              type: SummonEffectType.shadowWeaken,
+              summonerId: summoner.id,
+              targetIds: aliveEnemies.map((e) => e.id).toList(),
+              amount: dmg,
+              logMessage: log,
+            ));
           }
-        // 'golem' is passive - handled in _applyDefensivePassives
+        // 'golem' DR is also handled in _applyDefensivePassives
       }
     }
-    return logs;
+    return effects;
+  }
+
+  /// Necromancer skeletons: each skeleton attacks a random enemy.
+  /// Returns list of (targetId, damage, log) for animation.
+  static List<({String targetId, int damage, String log})> processSkeletonAttacks(
+    Character necromancer,
+    List<Enemy> enemies,
+  ) {
+    final results = <({String targetId, int damage, String log})>[];
+    final aliveEnemies = enemies.where((e) => e.isAlive).toList();
+    if (aliveEnemies.isEmpty || necromancer.skeletonCount <= 0) return results;
+
+    final baseDmg = 8;
+    for (int i = 0; i < necromancer.skeletonCount; i++) {
+      final alive = enemies.where((e) => e.isAlive).toList();
+      if (alive.isEmpty) break;
+      final target = alive[_random.nextInt(alive.length)];
+      final dmg = baseDmg + necromancer.totalMagic ~/ 3;
+      target.currentHp = max(0, target.currentHp - dmg);
+      var log = 'Skeleton attacks ${target.name} for $dmg damage!';
+      if (!target.isAlive) log += ' ${target.name} is defeated!';
+      results.add((targetId: target.id, damage: dmg, log: log));
+    }
+    return results;
   }
 
   /// Enemy AI: pick a random alive ally to attack with basic attack
@@ -646,6 +717,14 @@ class CombatService {
     if (ability.targetType == AbilityTarget.allEnemies) {
       // Hit all allies
       for (final ally in aliveAllies) {
+        // Necromancer skeleton shield: 50% chance a skeleton absorbs AoE hit
+        if (ally.characterClass == CharacterClass.necromancer &&
+            ally.skeletonCount > 0 &&
+            _random.nextInt(100) < 50) {
+          ally.skeletonCount--;
+          logs.add('A skeleton shields ${ally.name} from the blast and crumbles! (${ally.skeletonCount} remaining)');
+          continue;
+        }
         var (damage, isCrit) = calculateDamage(
           enemy.effectiveAttack,
           ability.damage,
@@ -711,6 +790,18 @@ class CombatService {
         target = backLiners[_random.nextInt(backLiners.length)];
       }
     }
+    // Necromancer skeleton shield: 50% chance a skeleton absorbs the hit
+    if (target.characterClass == CharacterClass.necromancer &&
+        target.skeletonCount > 0 &&
+        _random.nextInt(100) < 50) {
+      target.skeletonCount--;
+      if (!ability.isBasicAttack) ability.isAvailable = false;
+      logs.add(
+        '${enemy.name} attacks ${target.name}, but a skeleton blocks the blow and crumbles! (${target.skeletonCount} remaining)',
+      );
+      return logs.join(' ');
+    }
+
     var (damage, isCrit) = calculateDamage(
       enemy.effectiveAttack,
       ability.damage,

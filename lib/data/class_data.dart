@@ -30,11 +30,9 @@ const magicDamageClasses = {
   CharacterClass.wizard,
   CharacterClass.warlock,
   CharacterClass.summoner,
-  CharacterClass.spellsword,
   CharacterClass.druid,
   CharacterClass.sorcerer,
   CharacterClass.necromancer,
-  CharacterClass.artificer,
 };
 
 final Map<CharacterClass, ClassDefinition> classDefinitions = {
@@ -343,21 +341,23 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
       ),
       Ability(
         name: 'Lay on Hands',
-        description: 'Heal an ally with divine touch.',
+        description: 'Heal an ally with divine touch (scales with defense).',
         damage: -20,
         refreshChance: 55,
         targetType: AbilityTarget.singleAlly,
         unlockedAtLevel: 2,
+        healScalesWithDefense: true,
       ),
       Ability(
         name: 'Divine Shield',
         description:
-            'Heal yourself and raise a holy barrier, boosting defense by 50%.',
+            'Heal yourself and raise a holy barrier, boosting defense by 50% (scales with defense).',
         damage: -30,
         refreshChance: 40,
         targetType: AbilityTarget.self,
         unlockedAtLevel: 5,
         defenseBuffPercent: 50,
+        healScalesWithDefense: true,
       ),
       Ability(
         name: 'Consecrate',
@@ -486,13 +486,12 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         enemyDefenseDebuffPercent: 20,
       ),
       Ability(
-        name: 'Drain Life',
-        description: 'Steal life from an enemy.',
-        damage: 14,
-        refreshChance: 50,
-        targetType: AbilityTarget.singleEnemy,
+        name: 'Shadow Bolt',
+        description: 'Hurl a bolt of dark energy at all foes.',
+        damage: 10,
+        refreshChance: 45,
+        targetType: AbilityTarget.allEnemies,
         unlockedAtLevel: 5,
-        lifeDrain: true,
       ),
       Ability(
         name: 'Dark Pact',
@@ -583,15 +582,6 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         unlockedAtLevel: 8,
         summonId: 'shadow',
       ),
-      Ability(
-        name: 'Summon Swarm',
-        description: 'A swarm of insects damages all enemies each turn.',
-        damage: 0,
-        refreshChance: 100,
-        targetType: AbilityTarget.self,
-        unlockedAtLevel: 11,
-        summonId: 'swarm',
-      ),
     ],
   ),
 
@@ -630,29 +620,28 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
       Ability(
         name: 'Flame Blade',
         description:
-            'Your sword erupts in flame. Alternating with spells boosts damage!',
-        damage: 18,
-        refreshChance: 55,
+            'Your sword erupts in flame. Alternating with melee boosts damage!',
+        damage: 16,
+        refreshChance: 75,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 3,
-        isPhysicalAttack: true,
       ),
       Ability(
-        name: 'Frost Armor',
+        name: 'Rune Strike',
         description:
-            'Coat yourself in ice, healing and boosting defense by 25%.',
-        damage: -18,
-        refreshChance: 45,
-        targetType: AbilityTarget.self,
+            'A precise blade strike empowered by runes. Alternating with spells boosts damage!',
+        damage: 14,
+        refreshChance: 75,
+        targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 5,
-        defenseBuffPercent: 25,
+        isPhysicalAttack: true,
       ),
       Ability(
         name: 'Thunder Cleave',
         description:
             'Lightning-charged slash hits all. Alternating with melee boosts damage!',
         damage: 14,
-        refreshChance: 35,
+        refreshChance: 50,
         targetType: AbilityTarget.allEnemies,
         unlockedAtLevel: 8,
       ),
@@ -661,7 +650,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         description:
             'Unleash all magical energy in one strike. Alternating with melee boosts damage!',
         damage: 38,
-        refreshChance: 20,
+        refreshChance: 30,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 11,
       ),
@@ -691,12 +680,13 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     abilities: [
       Ability(
         name: 'Thorn Whip',
-        description: 'Lash out with thorny vines.',
+        description: 'Lash out with thorny vines, weakening the target.',
         damage: 9,
         refreshChance: 100,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 1,
         isBasicAttack: true,
+        enemyAttackDebuffPercent: 10,
       ),
       Ability(
         name: 'Rejuvenate',
@@ -906,11 +896,12 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
       ),
       Ability(
         name: 'Wild Surge',
-        description: 'Chaotic magic blasts a foe.',
+        description: 'Chaotic magic blasts a foe, may bounce to another enemy.',
         damage: 20,
         refreshChance: 55,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 2,
+        chaotic: true,
       ),
       Ability(
         name: 'Chaos Bolt',
@@ -972,13 +963,14 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         isBasicAttack: true,
       ),
       Ability(
-        name: 'Life Tap',
-        description: 'Drain life from an enemy to heal.',
-        damage: 16,
-        refreshChance: 55,
-        targetType: AbilityTarget.singleEnemy,
+        name: 'Summon Skeleton',
+        description:
+            'Raise a skeleton minion that attacks each turn and shields you from damage.',
+        damage: 0,
+        refreshChance: 70,
+        targetType: AbilityTarget.self,
         unlockedAtLevel: 2,
-        lifeDrain: true,
+        summonId: 'skeleton',
       ),
       Ability(
         name: 'Bone Shield',
@@ -1028,7 +1020,6 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
     ),
     initiativeModifier: 0.5,
     unlockedByDefault: true,
-    usesMagicForDamage: true,
     abilities: [
       Ability(
         name: 'Wrench Toss',

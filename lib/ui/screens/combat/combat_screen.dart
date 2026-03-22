@@ -12,6 +12,7 @@ import '../../../models/character.dart';
 import '../../../models/combat_state.dart';
 import '../../../models/enemy.dart';
 import '../../../models/enums.dart';
+import '../../../models/summon_effect.dart';
 import '../../../data/map_backgrounds.dart';
 import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
@@ -32,6 +33,11 @@ enum SpellType {
   iceStorm,
   chainLightning,
   meteor,
+  summonWolf,
+  summonGolem,
+  summonFairy,
+  summonShadow,
+  skeletonAttack,
 }
 
 class _AttackLineData {
@@ -170,18 +176,121 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         _advanceTurn();
         return;
       }
+      // Druid passive: Nature's Blessing — heal all alive allies for a small amount
+      if (char.characterClass == CharacterClass.druid) {
+        final heal = 3 + char.totalMagic ~/ 5;
+        final aliveAllies = _combat!.allies.where((a) => a.isAlive && a.currentHp < a.totalMaxHp).toList();
+        if (aliveAllies.isNotEmpty) {
+          for (final ally in aliveAllies) {
+            ally.currentHp = min(ally.totalMaxHp, ally.currentHp + heal);
+          }
+          setState(() {
+            _combat!.combatLog.add('Nature\'s Blessing heals the party for $heal HP each!');
+          });
+          _scrollLog();
+        }
+      }
+
+      // Artificer passive: Automatic Repair — heal 5% max HP at start of turn
+      if (char.characterClass == CharacterClass.artificer &&
+          char.currentHp < char.totalMaxHp) {
+        final repair = max(1, (char.totalMaxHp * 0.05).round());
+        char.currentHp = min(char.totalMaxHp, char.currentHp + repair);
+        setState(() {
+          _combat!.combatLog.add('Automatic Repair restores ${char.name} for $repair HP!');
+        });
+        _scrollLog();
+      }
+
       // Summoner: process persistent summon effects at start of turn
       if (char.activeSummons.isNotEmpty) {
-        final summonLogs = CombatService.processSummonEffects(
+        final effects = CombatService.processSummonEffects(
           char,
           _combat!.enemies,
           _combat!.allies,
         );
-        if (summonLogs.isNotEmpty) {
+        if (effects.isNotEmpty) {
+          final lines = <_AttackLineData>[];
+          for (final effect in effects) {
+            switch (effect.type) {
+              case SummonEffectType.wolfAttack:
+                lines.add(_AttackLineData(
+                  char.id, effect.targetId!, effect.amount, false, true,
+                  spellType: SpellType.summonWolf,
+                ));
+              case SummonEffectType.golemShield:
+                for (final allyId in effect.targetIds) {
+                  lines.add(_AttackLineData(
+                    char.id, allyId, 0, false, true,
+                    spellType: SpellType.summonGolem,
+                  ));
+                }
+              case SummonEffectType.fairyHeal:
+                lines.add(_AttackLineData(
+                  char.id, effect.targetId!, effect.amount, true, true,
+                  spellType: SpellType.summonFairy,
+                ));
+              case SummonEffectType.shadowWeaken:
+                for (final enemyId in effect.targetIds) {
+                  lines.add(_AttackLineData(
+                    char.id, enemyId, effect.amount, false, true,
+                    spellType: SpellType.summonShadow,
+                  ));
+                }
+            }
+          }
           setState(() {
-            _combat!.combatLog.addAll(summonLogs);
+            _combat!.combatLog.addAll(effects.map((e) => e.logMessage));
+            _attackLines = lines;
+            _waitingForInput = false;
           });
           _scrollLog();
+          _animateLines(holdMs: 400, onDone: () {
+            if (mounted) {
+              // Check if summons killed all enemies
+              if (_combat!.allEnemiesDead) {
+                _processNextTurn();
+              } else {
+                setState(() {
+                  _waitingForInput = true;
+                  _selectedAbility = null;
+                });
+              }
+            }
+          });
+          return;
+        }
+      }
+      // Necromancer: skeleton attacks at start of turn
+      if (char.skeletonCount > 0) {
+        final skelResults = CombatService.processSkeletonAttacks(
+          char,
+          _combat!.enemies,
+        );
+        if (skelResults.isNotEmpty) {
+          final lines = skelResults.map((r) => _AttackLineData(
+            char.id, r.targetId, r.damage, false, true,
+            spellType: SpellType.skeletonAttack,
+          )).toList();
+          setState(() {
+            _combat!.combatLog.addAll(skelResults.map((r) => r.log));
+            _attackLines = lines;
+            _waitingForInput = false;
+          });
+          _scrollLog();
+          _animateLines(holdMs: 400, onDone: () {
+            if (mounted) {
+              if (_combat!.allEnemiesDead) {
+                _processNextTurn();
+              } else {
+                setState(() {
+                  _waitingForInput = true;
+                  _selectedAbility = null;
+                });
+              }
+            }
+          });
+          return;
         }
       }
       setState(() {
@@ -205,6 +314,15 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         _combat!.allies,
         enemyDamageMultiplier: _enemyDamageMultiplier,
       );
+
+      // Barbarian passive: taking damage grants +5% attack and +5% defense
+      for (final a in _combat!.allies) {
+        final diff = allyHpBefore[a.id]! - a.currentHp;
+        if (diff > 0 && a.isAlive && a.characterClass == CharacterClass.barbarian) {
+          a.combatAttackMultiplier += 0.05;
+          a.combatDefenseMultiplier += 0.05;
+        }
+      }
 
       // Build attack lines from HP diffs
       final lines = <_AttackLineData>[];
@@ -571,7 +689,41 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       _selectedAbility = null;
     });
     _scrollLog();
-    _animateLines(holdMs: 300, onDone: _advanceTurn);
+
+    // Skeleton attacks immediately when summoned
+    if (ability.summonId == 'skeleton') {
+      _animateLines(holdMs: 300, onDone: () {
+        if (!mounted || _combat == null) return;
+        final skelResults = CombatService.processSkeletonAttacks(
+          char,
+          _combat!.enemies,
+        );
+        if (skelResults.isNotEmpty) {
+          final skelLines = skelResults.map((r) => _AttackLineData(
+            char.id, r.targetId, r.damage, false, true,
+            spellType: SpellType.skeletonAttack,
+          )).toList();
+          setState(() {
+            _combat!.combatLog.addAll(skelResults.map((r) => r.log));
+            _attackLines = skelLines;
+          });
+          _scrollLog();
+          _animateLines(holdMs: 300, onDone: () {
+            if (mounted) {
+              if (_combat!.allEnemiesDead) {
+                _processNextTurn();
+              } else {
+                _advanceTurn();
+              }
+            }
+          });
+        } else {
+          _advanceTurn();
+        }
+      });
+    } else {
+      _animateLines(holdMs: 300, onDone: _advanceTurn);
+    }
   }
 
   void _usePotion(Character target) {
@@ -739,8 +891,10 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     if (allyIdx >= 0) {
       final n = _combat!.allies.length;
       final sprite = _spriteSize(n);
+      final ally = _combat!.allies[allyIdx];
+      final frontLineOffset = ally.isFrontLine ? 24.0 : 0.0;
       return Offset(
-        size.width * 0.25 + sprite / 2 + 4, // right edge of ally sprite
+        size.width * 0.25 + sprite / 2 + 4 + frontLineOffset, // right edge of ally sprite
         size.height * (allyIdx + 1) / (n + 1),
       );
     }
@@ -964,30 +1118,35 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                                       AbilityTarget.singleAlly &&
                                   ally.isAlive) ||
                               (_potionMode && ally.isAlive);
+                          // Front liners shift right (closer to enemies)
+                          final frontLineOffset = ally.isFrontLine ? 24.0 : 0.0;
                           return Flexible(
-                            child: GestureDetector(
-                              onTap: isHealTarget || ref.read(helpModeProvider)
-                                  ? () {
-                                      if (ref.read(helpModeProvider)) {
-                                        ref
-                                                .read(helpModeProvider.notifier)
-                                                .state =
-                                            false;
-                                        showCharacterHelp(context, ally);
-                                        return;
+                            child: Padding(
+                              padding: EdgeInsets.only(left: frontLineOffset),
+                              child: GestureDetector(
+                                onTap: isHealTarget || ref.read(helpModeProvider)
+                                    ? () {
+                                        if (ref.read(helpModeProvider)) {
+                                          ref
+                                                  .read(helpModeProvider.notifier)
+                                                  .state =
+                                              false;
+                                          showCharacterHelp(context, ally);
+                                          return;
+                                        }
+                                        if (_potionMode) {
+                                          _usePotion(ally);
+                                        } else {
+                                          _useAbility(_selectedAbility!, ally);
+                                        }
                                       }
-                                      if (_potionMode) {
-                                        _usePotion(ally);
-                                      } else {
-                                        _useAbility(_selectedAbility!, ally);
-                                      }
-                                    }
-                                  : null,
-                              child: _buildAllyWidget(
-                                theme,
-                                ally,
-                                isCurrentTurn,
-                                isHealTarget,
+                                    : null,
+                                child: _buildAllyWidget(
+                                  theme,
+                                  ally,
+                                  isCurrentTurn,
+                                  isHealTarget,
+                                ),
                               ),
                             ),
                           );
@@ -1129,14 +1288,38 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             ),
             const SizedBox(height: 2),
             Flexible(
-              child: Opacity(
-                opacity: ally.isAlive ? 1.0 : 0.3,
-                child: IdleAnimatedSprite(
-                  imagePath: spritePath,
-                  size: spriteSize,
-                  phaseOffset: ally.id.hashCode.toDouble(),
-                  animate: ally.isAlive,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Opacity(
+                    opacity: ally.isAlive ? 1.0 : 0.3,
+                    child: IdleAnimatedSprite(
+                      imagePath: spritePath,
+                      size: spriteSize,
+                      phaseOffset: ally.id.hashCode.toDouble(),
+                      animate: ally.isAlive,
+                    ),
+                  ),
+                  if (ally.activeSummons.isNotEmpty)
+                    ...ally.activeSummons.map((id) =>
+                      Padding(
+                        padding: const EdgeInsets.only(left: 2),
+                        child: CustomPaint(
+                          size: Size(spriteSize, spriteSize),
+                          painter: _SummonIconPainter(id),
+                        ),
+                      ),
+                    ),
+                  if (ally.skeletonCount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2),
+                      child: CustomPaint(
+                        size: Size(spriteSize, spriteSize),
+                        painter: _SkeletonPackPainter(ally.skeletonCount),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 2),
@@ -1657,7 +1840,11 @@ class _AttackLinePainter extends CustomPainter {
   }
 
   void _paintLine(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
-    if (line.spellType == SpellType.normal || line.isHealing) {
+    if (line.isHealing && line.spellType == SpellType.summonFairy) {
+      _paintSummonFairy(canvas, from, to, line);
+    } else if (line.isHealing) {
+      _paintHealBeam(canvas, from, to, line);
+    } else if (line.spellType == SpellType.normal) {
       _paintStandardLine(canvas, from, to, line);
     } else {
       switch (line.spellType) {
@@ -1675,6 +1862,21 @@ class _AttackLinePainter extends CustomPainter {
           break;
         case SpellType.meteor:
           _paintMeteor(canvas, from, to, line);
+          break;
+        case SpellType.summonWolf:
+          _paintSummonWolf(canvas, from, to, line);
+          break;
+        case SpellType.summonGolem:
+          _paintSummonGolem(canvas, from, to, line);
+          break;
+        case SpellType.summonFairy:
+          _paintSummonFairy(canvas, from, to, line);
+          break;
+        case SpellType.summonShadow:
+          _paintSummonShadow(canvas, from, to, line);
+          break;
+        case SpellType.skeletonAttack:
+          _paintSkeletonAttack(canvas, from, to, line);
           break;
         case SpellType.normal:
           _paintStandardLine(canvas, from, to, line);
@@ -1713,6 +1915,79 @@ class _AttackLinePainter extends CustomPainter {
           overkill: line.overkill);
     }
   }
+
+  /// Heal glow: expanding glow on the target with yellow number.
+  void _paintHealBeam(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
+    final gold = const Color(0xFFFFD700);
+    final white = const Color(0xFFFFFDE7);
+    final p = progress.clamp(0.0, 1.0);
+
+    // Expanding glow rings on the target
+    final glowAlpha = (1.0 - p * 0.6).clamp(0.0, 1.0);
+    canvas.drawCircle(
+      to,
+      10 + p * 25,
+      Paint()..color = gold.withValues(alpha: 0.25 * glowAlpha),
+    );
+    canvas.drawCircle(
+      to,
+      6 + p * 16,
+      Paint()..color = white.withValues(alpha: 0.3 * glowAlpha),
+    );
+    // Inner bright pulse
+    canvas.drawCircle(
+      to,
+      4 + p * 8,
+      Paint()..color = gold.withValues(alpha: 0.4 * glowAlpha),
+    );
+
+    // Sparkle particles around the target
+    if (p > 0.1) {
+      for (int i = 0; i < 6; i++) {
+        final angle = (i / 6) * pi * 2 + p * 4;
+        final radius = 8.0 + p * 18;
+        final sparkleAlpha = (0.7 - p * 0.5).clamp(0.0, 1.0);
+        canvas.drawCircle(
+          Offset(to.dx + cos(angle) * radius, to.dy + sin(angle) * radius),
+          2.0,
+          Paint()..color = gold.withValues(alpha: sparkleAlpha),
+        );
+      }
+    }
+
+    // Yellow heal number above the target
+    if (p > 0.2 && line.amount > 0) {
+      final labelOpacity = ((p - 0.2) * 2).clamp(0.0, 1.0);
+      // Float upward as animation progresses
+      final floatY = (p - 0.2) * 20;
+      final label = '+${line.amount}';
+      final tp = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: gold.withValues(alpha: labelOpacity),
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            shadows: [
+              Shadow(color: Colors.black, blurRadius: 3),
+              Shadow(color: gold, blurRadius: 6),
+            ],
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(
+        canvas,
+        Offset(to.dx - tp.width / 2, to.dy - 35 - floatY),
+      );
+    }
+  }
+
 
   void _drawDamageLabel(
     Canvas canvas,
@@ -2121,6 +2396,670 @@ class _AttackLinePainter extends CustomPainter {
     }
   }
 
+  // -- Summon Wolf: gray wolf shape lunges from summoner to target ----------
+  void _paintSummonWolf(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    final gray = const Color(0xFF9E9E9E);
+    final darkGray = const Color(0xFF616161);
+    final p = progress.clamp(0.0, 1.0);
+
+    // Wolf lunges along the line
+    final currentPos = Offset(
+      from.dx + (to.dx - from.dx) * p,
+      from.dy + (to.dy - from.dy) * p,
+    );
+
+    // Draw wolf shape (simple triangle head + body)
+    final wolfSize = 10.0;
+    final dir = (to - from);
+    final dist = dir.distance;
+    if (dist == 0) return;
+    final nx = dir.dx / dist;
+    final ny = dir.dy / dist;
+
+    // Body (oval)
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(currentPos.dx - nx * 6, currentPos.dy - ny * 6),
+        width: wolfSize * 1.4,
+        height: wolfSize * 0.8,
+      ),
+      Paint()..color = gray,
+    );
+    // Head (triangle pointing forward)
+    final headPath = Path()
+      ..moveTo(currentPos.dx + nx * wolfSize, currentPos.dy + ny * wolfSize)
+      ..lineTo(currentPos.dx + ny * 5, currentPos.dy - nx * 5)
+      ..lineTo(currentPos.dx - ny * 5, currentPos.dy + nx * 5)
+      ..close();
+    canvas.drawPath(headPath, Paint()..color = darkGray);
+
+    // Ears
+    canvas.drawCircle(
+      Offset(currentPos.dx + ny * 4 + nx * 4, currentPos.dy - nx * 4 + ny * 4),
+      3, Paint()..color = gray,
+    );
+    canvas.drawCircle(
+      Offset(currentPos.dx - ny * 4 + nx * 4, currentPos.dy + nx * 4 + ny * 4),
+      3, Paint()..color = gray,
+    );
+
+    // Trail particles
+    for (int i = 0; i < 4; i++) {
+      final trailT = (p - i * 0.06).clamp(0.0, 1.0);
+      final tx = from.dx + (to.dx - from.dx) * trailT;
+      final ty = from.dy + (to.dy - from.dy) * trailT;
+      canvas.drawCircle(
+        Offset(tx, ty), 2.0 - i * 0.4,
+        Paint()..color = gray.withValues(alpha: 0.4 - i * 0.08),
+      );
+    }
+
+    // Impact claw slash at target
+    if (p > 0.85) {
+      final slashAlpha = ((p - 0.85) / 0.15).clamp(0.0, 1.0);
+      final slashPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.8 * slashAlpha)
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke;
+      // Three diagonal claw marks
+      for (int i = -1; i <= 1; i++) {
+        canvas.drawLine(
+          Offset(to.dx - 8 + i * 5, to.dy - 10),
+          Offset(to.dx + 4 + i * 5, to.dy + 10),
+          slashPaint,
+        );
+      }
+    }
+
+    if (p > 0.5) {
+      _drawDamageLabel(canvas, from, to, line.amount, false, gray,
+          overkill: line.overkill);
+    }
+  }
+
+  // -- Summon Golem: shield glow from summoner to allies --------------------
+  void _paintSummonGolem(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    final brown = const Color(0xFF8D6E63);
+    final gold = const Color(0xFFFFD700);
+    final p = progress.clamp(0.0, 1.0);
+
+    // Expanding shield ring at golem (summoner) position
+    if (p < 0.5) {
+      final ringP = (p / 0.5).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        from,
+        10 + ringP * 20,
+        Paint()
+          ..color = brown.withValues(alpha: 0.4 * (1.0 - ringP))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.0,
+      );
+    }
+
+    // Shield glow traveling to ally
+    final glowPos = Offset(
+      from.dx + (to.dx - from.dx) * p,
+      from.dy + (to.dy - from.dy) * p,
+    );
+    canvas.drawCircle(glowPos, 5, Paint()..color = gold.withValues(alpha: 0.5 * (1.0 - p)));
+    canvas.drawCircle(glowPos, 3, Paint()..color = brown.withValues(alpha: 0.7 * (1.0 - p)));
+
+    // Shield icon at ally when glow arrives
+    if (p > 0.6) {
+      final shieldP = ((p - 0.6) / 0.4).clamp(0.0, 1.0);
+      final shieldAlpha = (0.7 * (1.0 - (shieldP - 0.5).abs() * 2)).clamp(0.0, 1.0);
+      // Shield shape (pointed bottom)
+      final shieldPath = Path()
+        ..moveTo(to.dx - 10, to.dy - 10)
+        ..lineTo(to.dx + 10, to.dy - 10)
+        ..lineTo(to.dx + 10, to.dy + 2)
+        ..lineTo(to.dx, to.dy + 12)
+        ..lineTo(to.dx - 10, to.dy + 2)
+        ..close();
+      canvas.drawPath(
+        shieldPath,
+        Paint()..color = brown.withValues(alpha: shieldAlpha * 0.6),
+      );
+      canvas.drawPath(
+        shieldPath,
+        Paint()
+          ..color = gold.withValues(alpha: shieldAlpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0,
+      );
+    }
+  }
+
+  // -- Summon Fairy: sparkle dust raining on healed ally --------------------
+  void _paintSummonFairy(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    final pink = const Color(0xFFFF80AB);
+    final green = const Color(0xFF69F0AE);
+    final gold = const Color(0xFFFFD700);
+    final p = progress.clamp(0.0, 1.0);
+
+    // Green/pink glow on the target
+    final glowAlpha = (1.0 - p * 0.6).clamp(0.0, 1.0);
+    canvas.drawCircle(to, 10 + p * 25, Paint()..color = green.withValues(alpha: 0.2 * glowAlpha));
+    canvas.drawCircle(to, 6 + p * 16, Paint()..color = pink.withValues(alpha: 0.2 * glowAlpha));
+
+    // Fairy dust sparkles around target
+    if (p > 0.1) {
+      for (int i = 0; i < 8; i++) {
+        final angle = (i / 8) * pi * 2 + p * 4;
+        final radius = 8.0 + p * 18;
+        final sparkleAlpha = (0.7 - p * 0.5).clamp(0.0, 1.0);
+        final colors = [pink, green, gold];
+        canvas.drawCircle(
+          Offset(to.dx + cos(angle) * radius, to.dy + sin(angle) * radius),
+          2.0,
+          Paint()..color = colors[i % 3].withValues(alpha: sparkleAlpha),
+        );
+      }
+    }
+
+    // Yellow heal number
+    if (p > 0.2 && line.amount > 0) {
+      final labelOpacity = ((p - 0.2) * 2).clamp(0.0, 1.0);
+      final floatY = (p - 0.2) * 20;
+      final label = '+${line.amount}';
+      final tp = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: gold.withValues(alpha: labelOpacity),
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            shadows: [
+              Shadow(color: Colors.black, blurRadius: 3),
+              Shadow(color: gold, blurRadius: 6),
+            ],
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(to.dx - tp.width / 2, to.dy - 35 - floatY));
+    }
+  }
+
+  // -- Summon Shadow: dark clouds drifting to enemies -----------------------
+  void _paintSummonShadow(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    final darkPurple = const Color(0xFF4A148C);
+    final black = const Color(0xFF1A1A2E);
+    final p = progress.clamp(0.0, 1.0);
+
+    // Dark cloud drifts from summoner to enemy
+    final cloudPos = Offset(
+      from.dx + (to.dx - from.dx) * p,
+      from.dy + (to.dy - from.dy) * p + sin(p * pi * 4) * 8,
+    );
+
+    // Cloud shape (cluster of overlapping circles)
+    for (int i = 0; i < 5; i++) {
+      final ox = (i - 2) * 5.0 + sin(p * 10 + i) * 2;
+      final oy = (i.isEven ? -2.0 : 2.0) + cos(p * 8 + i) * 2;
+      canvas.drawCircle(
+        Offset(cloudPos.dx + ox, cloudPos.dy + oy),
+        5.0 + (i % 3),
+        Paint()..color = black.withValues(alpha: 0.6),
+      );
+    }
+    canvas.drawCircle(cloudPos, 4, Paint()..color = darkPurple.withValues(alpha: 0.5));
+
+    // Smoke trail
+    for (int i = 0; i < 3; i++) {
+      final trailT = (p - i * 0.08).clamp(0.0, 1.0);
+      final tx = from.dx + (to.dx - from.dx) * trailT;
+      final ty = from.dy + (to.dy - from.dy) * trailT + sin(trailT * pi * 4) * 8;
+      canvas.drawCircle(
+        Offset(tx, ty), 3.0 - i * 0.5,
+        Paint()..color = darkPurple.withValues(alpha: 0.2 - i * 0.05),
+      );
+    }
+
+    // Dark cloud impact at enemy
+    if (p > 0.7) {
+      final impP = ((p - 0.7) / 0.3).clamp(0.0, 1.0);
+      for (int i = 0; i < 6; i++) {
+        final angle = (i / 6) * pi * 2 + p * 3;
+        final radius = 8.0 + impP * 12;
+        canvas.drawCircle(
+          Offset(to.dx + cos(angle) * radius, to.dy + sin(angle) * radius),
+          3.0 + (i % 2) * 2,
+          Paint()..color = black.withValues(alpha: 0.5 * (1.0 - impP)),
+        );
+      }
+    }
+
+    if (p > 0.5 && line.amount > 0) {
+      _drawDamageLabel(canvas, from, to, line.amount, false, darkPurple,
+          overkill: line.overkill);
+    }
+  }
+
+  // -- Skeleton attack: bone projectile from necromancer to enemy -----------
+  void _paintSkeletonAttack(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    final bone = const Color(0xFFE0E0E0);
+    final dark = const Color(0xFF9E9E9E);
+    final p = progress.clamp(0.0, 1.0);
+
+    final currentPos = Offset(
+      from.dx + (to.dx - from.dx) * p,
+      from.dy + (to.dy - from.dy) * p,
+    );
+
+    // Spinning bone projectile
+    final angle = p * pi * 6;
+    final boneLen = 8.0;
+    canvas.drawLine(
+      Offset(currentPos.dx + cos(angle) * boneLen, currentPos.dy + sin(angle) * boneLen),
+      Offset(currentPos.dx - cos(angle) * boneLen, currentPos.dy - sin(angle) * boneLen),
+      Paint()..color = bone..strokeWidth = 3.0..style = PaintingStyle.stroke..strokeCap = StrokeCap.round,
+    );
+    // Knobs on ends
+    canvas.drawCircle(
+      Offset(currentPos.dx + cos(angle) * boneLen, currentPos.dy + sin(angle) * boneLen),
+      2.5, Paint()..color = bone,
+    );
+    canvas.drawCircle(
+      Offset(currentPos.dx - cos(angle) * boneLen, currentPos.dy - sin(angle) * boneLen),
+      2.5, Paint()..color = bone,
+    );
+
+    // Trail
+    for (int i = 0; i < 3; i++) {
+      final trailT = (p - i * 0.05).clamp(0.0, 1.0);
+      final tx = from.dx + (to.dx - from.dx) * trailT;
+      final ty = from.dy + (to.dy - from.dy) * trailT;
+      canvas.drawCircle(
+        Offset(tx, ty), 2.0 - i * 0.5,
+        Paint()..color = dark.withValues(alpha: 0.3 - i * 0.08),
+      );
+    }
+
+    // Impact
+    if (p > 0.85) {
+      final impAlpha = ((p - 0.85) / 0.15).clamp(0.0, 1.0);
+      canvas.drawCircle(to, 12 * impAlpha,
+        Paint()..color = bone.withValues(alpha: 0.3 * (1.0 - impAlpha)));
+    }
+
+    if (p > 0.5) {
+      _drawDamageLabel(canvas, from, to, line.amount, false, dark,
+          overkill: line.overkill);
+    }
+  }
+
   @override
   bool shouldRepaint(covariant _AttackLinePainter old) => true;
+}
+
+// ===========================================================================
+// Summon icon painter (small icons under summoner sprite)
+// ===========================================================================
+class _SummonIconPainter extends CustomPainter {
+  final String summonId;
+  _SummonIconPainter(this.summonId);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final s = size.width / 96; // scale factor (96 = default sprite size)
+
+    switch (summonId) {
+      case 'wolf':
+        // Gray wolf — body, head, snout, ears, legs, tail
+        final body = Paint()..color = const Color(0xFF9E9E9E);
+        final dark = Paint()..color = const Color(0xFF616161);
+        final eye = Paint()..color = const Color(0xFFFFEB3B);
+        // Body
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset(cx, cy + 4 * s), width: 40 * s, height: 24 * s),
+          body,
+        );
+        // Head
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset(cx + 18 * s, cy - 6 * s), width: 22 * s, height: 18 * s),
+          body,
+        );
+        // Snout
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset(cx + 28 * s, cy - 4 * s), width: 12 * s, height: 8 * s),
+          dark,
+        );
+        // Ears
+        final earPath = Path()
+          ..moveTo(cx + 14 * s, cy - 14 * s)
+          ..lineTo(cx + 10 * s, cy - 26 * s)
+          ..lineTo(cx + 20 * s, cy - 16 * s)
+          ..close();
+        canvas.drawPath(earPath, dark);
+        final earPath2 = Path()
+          ..moveTo(cx + 22 * s, cy - 14 * s)
+          ..lineTo(cx + 20 * s, cy - 26 * s)
+          ..lineTo(cx + 28 * s, cy - 16 * s)
+          ..close();
+        canvas.drawPath(earPath2, dark);
+        // Eyes
+        canvas.drawCircle(Offset(cx + 22 * s, cy - 10 * s), 3 * s, eye);
+        canvas.drawCircle(Offset(cx + 22 * s, cy - 10 * s), 1.5 * s, Paint()..color = Colors.black);
+        // Legs
+        for (final lx in [-12.0, -4.0, 8.0, 16.0]) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(cx + lx * s, cy + 14 * s, 6 * s, 16 * s),
+              Radius.circular(2 * s),
+            ),
+            dark,
+          );
+        }
+        // Tail
+        final tailPath = Path()
+          ..moveTo(cx - 20 * s, cy)
+          ..quadraticBezierTo(cx - 32 * s, cy - 14 * s, cx - 26 * s, cy - 22 * s);
+        canvas.drawPath(tailPath, Paint()
+          ..color = const Color(0xFF9E9E9E)
+          ..strokeWidth = 4 * s
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round);
+
+      case 'golem':
+        // Brown/gray rock golem — blocky humanoid
+        final rock = Paint()..color = const Color(0xFF8D6E63);
+        final darkRock = Paint()..color = const Color(0xFF6D4C41);
+        final highlight = Paint()..color = const Color(0xFFA1887F);
+        final eye = Paint()..color = const Color(0xFFFFD54F);
+        // Body (large rectangle)
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(center: Offset(cx, cy + 2 * s), width: 32 * s, height: 30 * s),
+            Radius.circular(4 * s),
+          ),
+          rock,
+        );
+        // Head
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(center: Offset(cx, cy - 18 * s), width: 22 * s, height: 18 * s),
+            Radius.circular(3 * s),
+          ),
+          darkRock,
+        );
+        // Eyes (glowing)
+        canvas.drawCircle(Offset(cx - 5 * s, cy - 20 * s), 3 * s, eye);
+        canvas.drawCircle(Offset(cx + 5 * s, cy - 20 * s), 3 * s, eye);
+        // Arms (thick rectangles)
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(cx - 24 * s, cy - 8 * s, 10 * s, 24 * s),
+            Radius.circular(3 * s),
+          ),
+          darkRock,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(cx + 14 * s, cy - 8 * s, 10 * s, 24 * s),
+            Radius.circular(3 * s),
+          ),
+          darkRock,
+        );
+        // Legs
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(cx - 12 * s, cy + 16 * s, 10 * s, 16 * s),
+            Radius.circular(2 * s),
+          ),
+          darkRock,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(cx + 2 * s, cy + 16 * s, 10 * s, 16 * s),
+            Radius.circular(2 * s),
+          ),
+          darkRock,
+        );
+        // Rock texture lines
+        canvas.drawLine(
+          Offset(cx - 10 * s, cy - 4 * s), Offset(cx + 8 * s, cy),
+          highlight..style = PaintingStyle.stroke..strokeWidth = 1.5 * s,
+        );
+        canvas.drawLine(
+          Offset(cx - 6 * s, cy + 8 * s), Offset(cx + 12 * s, cy + 6 * s),
+          highlight..style = PaintingStyle.stroke..strokeWidth = 1.5 * s,
+        );
+
+      case 'fairy':
+        // Glowing fairy with wings
+        final green = Paint()..color = const Color(0xFF69F0AE);
+        final pink = const Color(0xFFFF80AB);
+        final glow = Paint()..color = const Color(0xFFFFF9C4);
+        // Outer glow
+        canvas.drawCircle(Offset(cx, cy), 16 * s,
+          Paint()..color = const Color(0xFF69F0AE).withValues(alpha: 0.15));
+        // Wings (large, translucent)
+        final leftWing = Path()
+          ..moveTo(cx, cy)
+          ..quadraticBezierTo(cx - 28 * s, cy - 20 * s, cx - 16 * s, cy - 30 * s)
+          ..quadraticBezierTo(cx - 6 * s, cy - 16 * s, cx, cy)
+          ..close();
+        final rightWing = Path()
+          ..moveTo(cx, cy)
+          ..quadraticBezierTo(cx + 28 * s, cy - 20 * s, cx + 16 * s, cy - 30 * s)
+          ..quadraticBezierTo(cx + 6 * s, cy - 16 * s, cx, cy)
+          ..close();
+        final leftWingLow = Path()
+          ..moveTo(cx, cy + 2 * s)
+          ..quadraticBezierTo(cx - 22 * s, cy + 6 * s, cx - 14 * s, cy + 20 * s)
+          ..quadraticBezierTo(cx - 4 * s, cy + 10 * s, cx, cy + 2 * s)
+          ..close();
+        final rightWingLow = Path()
+          ..moveTo(cx, cy + 2 * s)
+          ..quadraticBezierTo(cx + 22 * s, cy + 6 * s, cx + 14 * s, cy + 20 * s)
+          ..quadraticBezierTo(cx + 4 * s, cy + 10 * s, cx, cy + 2 * s)
+          ..close();
+        final wingPaint = Paint()..color = pink.withValues(alpha: 0.5);
+        canvas.drawPath(leftWing, wingPaint);
+        canvas.drawPath(rightWing, wingPaint);
+        canvas.drawPath(leftWingLow, wingPaint);
+        canvas.drawPath(rightWingLow, wingPaint);
+        // Wing outlines
+        final wingStroke = Paint()
+          ..color = pink.withValues(alpha: 0.7)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5 * s;
+        canvas.drawPath(leftWing, wingStroke);
+        canvas.drawPath(rightWing, wingStroke);
+        // Body
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset(cx, cy), width: 10 * s, height: 16 * s),
+          green,
+        );
+        // Head
+        canvas.drawCircle(Offset(cx, cy - 10 * s), 6 * s, green);
+        // Face glow
+        canvas.drawCircle(Offset(cx, cy - 10 * s), 4 * s, glow);
+        // Eyes
+        canvas.drawCircle(Offset(cx - 2.5 * s, cy - 11 * s), 1.5 * s, Paint()..color = Colors.black);
+        canvas.drawCircle(Offset(cx + 2.5 * s, cy - 11 * s), 1.5 * s, Paint()..color = Colors.black);
+
+      case 'shadow':
+        // Dark ghost — wispy, translucent
+        final darkPurple = const Color(0xFF4A148C);
+        final ghostBody = Paint()..color = darkPurple.withValues(alpha: 0.7);
+        final eyeColor = Paint()..color = const Color(0xFFCE93D8);
+        // Main ghost shape
+        final ghostPath = Path()
+          ..moveTo(cx - 20 * s, cy + 20 * s)
+          ..quadraticBezierTo(cx - 24 * s, cy - 10 * s, cx, cy - 28 * s)
+          ..quadraticBezierTo(cx + 24 * s, cy - 10 * s, cx + 20 * s, cy + 20 * s)
+          // Wavy bottom
+          ..lineTo(cx + 14 * s, cy + 12 * s)
+          ..lineTo(cx + 8 * s, cy + 20 * s)
+          ..lineTo(cx + 2 * s, cy + 12 * s)
+          ..lineTo(cx - 4 * s, cy + 20 * s)
+          ..lineTo(cx - 10 * s, cy + 12 * s)
+          ..lineTo(cx - 16 * s, cy + 20 * s)
+          ..close();
+        canvas.drawPath(ghostPath, ghostBody);
+        // Darker inner shadow
+        canvas.drawPath(ghostPath, Paint()
+          ..color = Colors.black.withValues(alpha: 0.2));
+        // Eyes (hollow, glowing)
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset(cx - 7 * s, cy - 8 * s), width: 10 * s, height: 12 * s),
+          eyeColor,
+        );
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset(cx + 7 * s, cy - 8 * s), width: 10 * s, height: 12 * s),
+          eyeColor,
+        );
+        // Dark pupils
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset(cx - 7 * s, cy - 6 * s), width: 5 * s, height: 7 * s),
+          Paint()..color = Colors.black,
+        );
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset(cx + 7 * s, cy - 6 * s), width: 5 * s, height: 7 * s),
+          Paint()..color = Colors.black,
+        );
+        // Mouth
+        canvas.drawOval(
+          Rect.fromCenter(center: Offset(cx, cy + 6 * s), width: 10 * s, height: 8 * s),
+          Paint()..color = Colors.black.withValues(alpha: 0.6),
+        );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SummonIconPainter old) => old.summonId != summonId;
+}
+
+// ===========================================================================
+// Skeleton pack painter (overlapping skeletons with count)
+// ===========================================================================
+class _SkeletonPackPainter extends CustomPainter {
+  final int count;
+  _SkeletonPackPainter(this.count);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final s = size.width / 96;
+
+    final bone = const Color(0xFFE0E0E0);
+    final darkBone = const Color(0xFFBDBDBD);
+    final eyeColor = const Color(0xFF1B5E20);
+
+    // Draw overlapping skulls (up to 3 visible, offset)
+    final visible = count.clamp(1, 3);
+    for (int i = visible - 1; i >= 0; i--) {
+      final ox = i * 8.0 * s;
+      final oy = i * -4.0 * s;
+      final alpha = i == 0 ? 1.0 : 0.6 - i * 0.15;
+
+      // Rib cage / body
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: Offset(cx + ox, cy + 10 * s + oy), width: 20 * s, height: 24 * s),
+          Radius.circular(4 * s),
+        ),
+        Paint()..color = darkBone.withValues(alpha: alpha * 0.7),
+      );
+      // Ribs
+      for (int r = 0; r < 3; r++) {
+        canvas.drawLine(
+          Offset(cx + ox - 8 * s, cy + (2 + r * 6) * s + oy),
+          Offset(cx + ox + 8 * s, cy + (2 + r * 6) * s + oy),
+          Paint()
+            ..color = bone.withValues(alpha: alpha * 0.5)
+            ..strokeWidth = 1.5 * s
+            ..style = PaintingStyle.stroke,
+        );
+      }
+
+      // Skull
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(cx + ox, cy - 14 * s + oy), width: 22 * s, height: 20 * s),
+        Paint()..color = bone.withValues(alpha: alpha),
+      );
+      // Eye sockets
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(cx + ox - 5 * s, cy - 16 * s + oy), width: 7 * s, height: 8 * s),
+        Paint()..color = eyeColor.withValues(alpha: alpha),
+      );
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(cx + ox + 5 * s, cy - 16 * s + oy), width: 7 * s, height: 8 * s),
+        Paint()..color = eyeColor.withValues(alpha: alpha),
+      );
+      // Nose
+      canvas.drawPath(
+        Path()
+          ..moveTo(cx + ox - 2 * s, cy - 10 * s + oy)
+          ..lineTo(cx + ox + 2 * s, cy - 10 * s + oy)
+          ..lineTo(cx + ox, cy - 7 * s + oy)
+          ..close(),
+        Paint()..color = Colors.black.withValues(alpha: alpha * 0.6),
+      );
+      // Jaw
+      canvas.drawArc(
+        Rect.fromCenter(center: Offset(cx + ox, cy - 6 * s + oy), width: 14 * s, height: 8 * s),
+        0, pi,
+        false,
+        Paint()
+          ..color = darkBone.withValues(alpha: alpha)
+          ..strokeWidth = 2 * s
+          ..style = PaintingStyle.stroke,
+      );
+
+      // Arms (bone sticks)
+      canvas.drawLine(
+        Offset(cx + ox - 10 * s, cy + 4 * s + oy),
+        Offset(cx + ox - 18 * s, cy + 18 * s + oy),
+        Paint()..color = bone.withValues(alpha: alpha)..strokeWidth = 2.5 * s..strokeCap = StrokeCap.round,
+      );
+      canvas.drawLine(
+        Offset(cx + ox + 10 * s, cy + 4 * s + oy),
+        Offset(cx + ox + 18 * s, cy + 18 * s + oy),
+        Paint()..color = bone.withValues(alpha: alpha)..strokeWidth = 2.5 * s..strokeCap = StrokeCap.round,
+      );
+
+      // Legs
+      canvas.drawLine(
+        Offset(cx + ox - 4 * s, cy + 22 * s + oy),
+        Offset(cx + ox - 6 * s, cy + 34 * s + oy),
+        Paint()..color = bone.withValues(alpha: alpha)..strokeWidth = 2.5 * s..strokeCap = StrokeCap.round,
+      );
+      canvas.drawLine(
+        Offset(cx + ox + 4 * s, cy + 22 * s + oy),
+        Offset(cx + ox + 6 * s, cy + 34 * s + oy),
+        Paint()..color = bone.withValues(alpha: alpha)..strokeWidth = 2.5 * s..strokeCap = StrokeCap.round,
+      );
+    }
+
+    // Count badge
+    if (count > 0) {
+      final badgeCenter = Offset(cx + 16 * s, cy - 26 * s);
+      canvas.drawCircle(badgeCenter, 10 * s, Paint()..color = Colors.black.withValues(alpha: 0.7));
+      canvas.drawCircle(badgeCenter, 10 * s, Paint()
+        ..color = const Color(0xFF4CAF50)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5 * s);
+      final tp = TextPainter(
+        text: TextSpan(
+          text: '$count',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 12 * s,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(badgeCenter.dx - tp.width / 2, badgeCenter.dy - tp.height / 2));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SkeletonPackPainter old) => old.count != count;
 }

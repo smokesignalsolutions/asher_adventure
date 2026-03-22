@@ -473,13 +473,6 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     await _autoSave();
   }
 
-  Future<void> toggleFrontLine(String charId) async {
-    if (state == null) return;
-    final char = state!.party.firstWhere((c) => c.id == charId);
-    char.isFrontLine = !char.isFrontLine;
-    state = _refreshState();
-    await _autoSave();
-  }
 
   /// Returns the final GameState snapshot for LP calculation, then clears state.
   GameState? endRun() {

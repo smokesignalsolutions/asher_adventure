@@ -55,6 +55,7 @@ class Character {
   List<String> activeSummons; // summoner: persistent summon IDs (combat-only)
   bool? lastAttackWasPhysical; // spellsword: track alternation (combat-only)
   bool isFrontLine; // front line characters are targeted more often
+  int skeletonCount; // necromancer: active skeleton minions (combat-only)
 
   Character({
     required this.id,
@@ -77,6 +78,7 @@ class Character {
     List<String>? activeSummons,
     this.lastAttackWasPhysical,
     this.isFrontLine = true,
+    this.skeletonCount = 0,
   }) : equipment = equipment ?? {
          for (var slot in EquipmentSlot.values) slot: null,
        },
