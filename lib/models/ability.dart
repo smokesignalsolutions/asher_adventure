@@ -9,24 +9,29 @@ class Ability {
   final int unlockedAtLevel;
   final bool isBasicAttack;
   final bool lifeDrain; // heals attacker for 50% of damage dealt
-  final bool appliesVulnerability; // enemy takes 5-15% more damage from all attacks
-  final int healPercentMaxHp; // heals for % of target's max HP (bypasses magic formula)
+  final bool
+  appliesVulnerability; // enemy takes 5-15% more damage from all attacks
+  final int
+  healPercentMaxHp; // heals for % of target's max HP (bypasses magic formula)
   final int attackBuffPercent; // buff target's attack by this %
   final int defenseBuffPercent; // buff target's defense by this %
   final int enemyAttackDebuffPercent; // reduce enemy attack by this %
   final int enemyDefenseDebuffPercent; // reduce enemy defense by this %
   final bool darkPact; // sacrifice 15-25% HP, deal 1.5x to all enemies
   final int grantCasterDefensePercent; // grant % of caster's defense to target
-  final bool healScalesWithDefense; // use defense instead of magic for heal calc
+  final bool
+  healScalesWithDefense; // use defense instead of magic for heal calc
   final int tempEnemyAttackDebuffPercent; // temporary attack debuff on enemy
   final int debuffDuration; // turns the temp debuff lasts
   final bool chaotic; // wider variance (-25% to +25%) + 50% chance to bounce
   final int stunChance; // 0-100% chance to stun enemy (skip next turn)
-  final int hitCount; // number of times this ability hits (each hit rolls separately)
+  final int
+  hitCount; // number of times this ability hits (each hit rolls separately)
   final int minTargets; // random multi-target: min targets (0 = not used)
   final int maxTargets; // random multi-target: max targets
   final String summonId; // persistent summon identifier (summoner class)
   final bool isPhysicalAttack; // for spellsword alternating bonus
+  final bool rogueDualStrike; // rogue: 15% chance to execute ability twice
   bool isAvailable;
 
   Ability({
@@ -56,17 +61,18 @@ class Ability {
     this.maxTargets = 0,
     this.summonId = '',
     this.isPhysicalAttack = false,
+    this.rogueDualStrike = false,
     this.isAvailable = true,
   });
 
-  Ability copyWith({bool? isAvailable}) {
+  Ability copyWith({bool? isAvailable, int? unlockedAtLevel}) {
     return Ability(
       name: name,
       description: description,
       damage: damage,
       refreshChance: refreshChance,
       targetType: targetType,
-      unlockedAtLevel: unlockedAtLevel,
+      unlockedAtLevel: unlockedAtLevel ?? this.unlockedAtLevel,
       isBasicAttack: isBasicAttack,
       lifeDrain: lifeDrain,
       appliesVulnerability: appliesVulnerability,
@@ -87,6 +93,7 @@ class Ability {
       maxTargets: maxTargets,
       summonId: summonId,
       isPhysicalAttack: isPhysicalAttack,
+      rogueDualStrike: rogueDualStrike,
       isAvailable: isAvailable ?? this.isAvailable,
     );
   }
@@ -119,6 +126,7 @@ class Ability {
     'maxTargets': maxTargets,
     'summonId': summonId,
     'isPhysicalAttack': isPhysicalAttack,
+    'rogueDualStrike': rogueDualStrike,
   };
 
   factory Ability.fromJson(Map<String, dynamic> json) => Ability(
@@ -148,6 +156,7 @@ class Ability {
     maxTargets: json['maxTargets'] ?? 0,
     summonId: json['summonId'] ?? '',
     isPhysicalAttack: json['isPhysicalAttack'] ?? false,
+    rogueDualStrike: json['rogueDualStrike'] ?? false,
     isAvailable: json['isAvailable'] ?? true,
   );
 }

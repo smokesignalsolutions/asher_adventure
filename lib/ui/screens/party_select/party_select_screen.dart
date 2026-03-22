@@ -16,7 +16,8 @@ import '../../widgets/audio_controls.dart';
 import '../../widgets/help_button.dart';
 
 class PartySelectScreen extends ConsumerStatefulWidget {
-  const PartySelectScreen({super.key});
+  final bool testMode;
+  const PartySelectScreen({super.key, this.testMode = false});
 
   @override
   ConsumerState<PartySelectScreen> createState() => _PartySelectScreenState();
@@ -36,6 +37,7 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
   }
 
   List<CharacterClass> get _unlockedClasses {
+    if (widget.testMode) return CharacterClass.values;
     final profile = ref.read(playerProfileProvider);
     if (profile == null) {
       return PlayerProfile.starterClasses;
@@ -67,6 +69,7 @@ class _PartySelectScreenState extends ConsumerState<PartySelectScreen> {
       profile: profile,
       activePerk: _selectedPerk,
       activeMutator: mutator.id,
+      testMode: widget.testMode,
     );
 
     if (mounted) context.go('/map');

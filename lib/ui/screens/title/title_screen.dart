@@ -200,6 +200,20 @@ class _TitleScreenState extends ConsumerState<TitleScreen> {
                         label: const Text('Guide'),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: 220,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          ref
+                              .read(audioProvider.notifier)
+                              .playSfx(SfxType.menuSelect);
+                          context.go('/party-select?testMode=true');
+                        },
+                        icon: const Icon(Icons.bug_report),
+                        label: const Text('Test Mode'),
+                      ),
+                    ),
                   ],
                 ),
         ),

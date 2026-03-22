@@ -25,15 +25,33 @@ import '../../widgets/help_dialogs.dart';
 // ---------------------------------------------------------------------------
 // Attack line data
 // ---------------------------------------------------------------------------
+enum SpellType {
+  normal,
+  burningHands,
+  fireball,
+  iceStorm,
+  chainLightning,
+  meteor,
+}
+
 class _AttackLineData {
   final String attackerId;
   final String targetId;
   final int amount;
   final bool isHealing;
-  final bool isSpell; // false = physical attack, true = magic/spell
-  const _AttackLineData(this.attackerId, this.targetId, this.amount, this.isHealing, this.isSpell);
+  final bool isSpell;
+  final SpellType spellType;
+  final int overkill;
+  const _AttackLineData(
+    this.attackerId,
+    this.targetId,
+    this.amount,
+    this.isHealing,
+    this.isSpell, {
+    this.spellType = SpellType.normal,
+    this.overkill = 0,
+  });
 }
-
 
 // ---------------------------------------------------------------------------
 // Combat screen
@@ -85,7 +103,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       parent: _lineAnimController,
       curve: Curves.easeOutCubic,
     );
-    _backgroundPath = 'assets/sprites/backgrounds/meadow.png'; // default, set in _initCombat
+    _backgroundPath =
+        'assets/sprites/backgrounds/meadow.png'; // default, set in _initCombat
     WidgetsBinding.instance.addPostFrameCallback((_) => _initCombat());
   }
 
@@ -94,7 +113,10 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     if (gameState == null) return;
 
     _backgroundPath = combatBackground(gameState.currentMapNumber);
-    _enemyDamageMultiplier = getMutatorEffect(gameState.activeMutator, 'enemy_damage');
+    _enemyDamageMultiplier = getMutatorEffect(
+      gameState.activeMutator,
+      'enemy_damage',
+    );
     _healingMultiplier = getMutatorEffect(gameState.activeMutator, 'healing');
 
     final notifier = ref.read(gameStateProvider.notifier);
@@ -150,7 +172,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       }
       // Summoner: process persistent summon effects at start of turn
       if (char.activeSummons.isNotEmpty) {
-        final summonLogs = CombatService.processSummonEffects(char, _combat!.enemies, _combat!.allies);
+        final summonLogs = CombatService.processSummonEffects(
+          char,
+          _combat!.enemies,
+          _combat!.allies,
+        );
         if (summonLogs.isNotEmpty) {
           setState(() {
             _combat!.combatLog.addAll(summonLogs);
@@ -174,7 +200,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       final allyHpBefore = {for (final a in _combat!.allies) a.id: a.currentHp};
       final enemyHpBefore = enemy.currentHp;
 
-      final log = CombatService.executeEnemyTurn(enemy, _combat!.allies, enemyDamageMultiplier: _enemyDamageMultiplier);
+      final log = CombatService.executeEnemyTurn(
+        enemy,
+        _combat!.allies,
+        enemyDamageMultiplier: _enemyDamageMultiplier,
+      );
 
       // Build attack lines from HP diffs
       final lines = <_AttackLineData>[];
@@ -187,12 +217,27 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       for (final a in _combat!.allies) {
         final diff = allyHpBefore[a.id]! - a.currentHp;
         if (diff > 0) {
-          lines.add(_AttackLineData(enemy.id, a.id, diff, false, isAoE || enemy.magic > enemy.attack));
+          lines.add(
+            _AttackLineData(
+              enemy.id,
+              a.id,
+              diff,
+              false,
+              isAoE || enemy.magic > enemy.attack,
+            ),
+          );
         }
       }
       if (enemy.currentHp > enemyHpBefore) {
-        lines.add(_AttackLineData(
-            enemy.id, enemy.id, enemy.currentHp - enemyHpBefore, true, true));
+        lines.add(
+          _AttackLineData(
+            enemy.id,
+            enemy.id,
+            enemy.currentHp - enemyHpBefore,
+            true,
+            true,
+          ),
+        );
       }
 
       setState(() {
@@ -253,36 +298,56 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
   }
 
   // -- Ally ability usage ---------------------------------------------------
+
+  SpellType _getSpellType(Ability ability) {
+    switch (ability.name.toLowerCase()) {
+      case 'burning hands':
+        return SpellType.burningHands;
+      case 'fireball':
+        return SpellType.fireball;
+      case 'ice storm':
+        return SpellType.iceStorm;
+      case 'chain lightning':
+        return SpellType.chainLightning;
+      case 'meteor':
+        return SpellType.meteor;
+      default:
+        return SpellType.normal;
+    }
+  }
+
   void _useAbility(Ability ability, dynamic target) {
     if (_combat == null) return;
     final current = _combat!.currentCombatant;
     final char = _combat!.allies.firstWhere((c) => c.id == current.id);
 
     // Snapshot HP before action
-    final enemyHpBefore = {
-      for (final e in _combat!.enemies) e.id: e.currentHp
-    };
-    final allyHpBefore = {
-      for (final a in _combat!.allies) a.id: a.currentHp
-    };
+    final enemyHpBefore = {for (final e in _combat!.enemies) e.id: e.currentHp};
+    final allyHpBefore = {for (final a in _combat!.allies) a.id: a.currentHp};
 
     // Spellsword: alternating physical/magic bonus (+30%)
     bool spellswordBoosted = false;
-    if (char.characterClass == CharacterClass.spellsword && ability.damage > 0) {
+    if (char.characterClass == CharacterClass.spellsword &&
+        ability.damage > 0) {
       final isPhysical = ability.isPhysicalAttack;
-      if (char.lastAttackWasPhysical != null && char.lastAttackWasPhysical != isPhysical) {
+      if (char.lastAttackWasPhysical != null &&
+          char.lastAttackWasPhysical != isPhysical) {
         char.combatAttackMultiplier += 0.30;
         spellswordBoosted = true;
       }
       char.lastAttackWasPhysical = isPhysical;
     }
 
+    // Track raw damage per enemy for overkill display
+    final rawDamageByEnemy = <String, int>{};
+
     String log;
     if (ability.darkPact) {
       // Dark Pact: special handling - sacrifice HP, damage all enemies
       if (!ability.isBasicAttack) ability.isAvailable = false;
       log = CombatService.executeDarkPact(
-        char, _combat!.enemies.where((e) => e.isAlive).toList(),
+        char,
+        _combat!.enemies.where((e) => e.isAlive).toList(),
       );
     } else if (ability.minTargets > 0) {
       // Multi-target: if alive <= minTargets, hit all; otherwise pick random unique targets
@@ -291,30 +356,62 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       if (aliveEnemies.length <= ability.minTargets) {
         targets = List.of(aliveEnemies);
       } else {
-        final count = ability.minTargets + Random().nextInt(ability.maxTargets - ability.minTargets + 1);
+        final count =
+            ability.minTargets +
+            Random().nextInt(ability.maxTargets - ability.minTargets + 1);
         final shuffled = List.of(aliveEnemies)..shuffle();
         targets = shuffled.take(count.clamp(1, aliveEnemies.length)).toList();
       }
       final logs = <String>[];
       for (final enemy in targets) {
         if (!enemy.isAlive) continue;
-        logs.add(CombatService.executeAllyTurn(char, ability, enemy, healingMultiplier: _healingMultiplier));
+        final result = CombatService.executeAllyTurn(
+          char,
+          ability,
+          enemy,
+          healingMultiplier: _healingMultiplier,
+        );
+        logs.add(result.$1);
+        rawDamageByEnemy[enemy.id] = (rawDamageByEnemy[enemy.id] ?? 0) + result.$2;
       }
       log = logs.join(' ');
     } else if (ability.targetType == AbilityTarget.allEnemies) {
       final logs = <String>[];
       for (final enemy in _combat!.enemies.where((e) => e.isAlive)) {
-        logs.add(CombatService.executeAllyTurn(char, ability, enemy, healingMultiplier: _healingMultiplier));
+        final result = CombatService.executeAllyTurn(
+          char,
+          ability,
+          enemy,
+          healingMultiplier: _healingMultiplier,
+        );
+        logs.add(result.$1);
+        rawDamageByEnemy[enemy.id] = (rawDamageByEnemy[enemy.id] ?? 0) + result.$2;
       }
       log = logs.join(' ');
     } else if (ability.targetType == AbilityTarget.allAllies) {
       final logs = <String>[];
       for (final ally in _combat!.allies.where((a) => a.isAlive)) {
-        logs.add(CombatService.executeAllyTurn(char, ability, ally, healingMultiplier: _healingMultiplier));
+        logs.add(
+          CombatService.executeAllyTurn(
+            char,
+            ability,
+            ally,
+            healingMultiplier: _healingMultiplier,
+          ).$1,
+        );
       }
       log = logs.join(' ');
     } else {
-      log = CombatService.executeAllyTurn(char, ability, target, healingMultiplier: _healingMultiplier);
+      final result = CombatService.executeAllyTurn(
+        char,
+        ability,
+        target,
+        healingMultiplier: _healingMultiplier,
+      );
+      log = result.$1;
+      if (target is Enemy) {
+        rawDamageByEnemy[target.id] = result.$2;
+      }
     }
 
     // Revert spellsword boost
@@ -322,18 +419,42 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       char.combatAttackMultiplier -= 0.30;
     }
 
+    // Rogue: 15% chance for dual strike
+    String dualStrikeLog = '';
+    String? dualStrikeTargetId;
+    int dualStrikeDamage = 0;
+    if (char.characterClass == CharacterClass.rogue &&
+        ability.damage > 0 &&
+        Random().nextInt(100) < 15) {
+      final aliveEnemies = _combat!.enemies.where((e) => e.isAlive).toList();
+      if (aliveEnemies.isNotEmpty) {
+        final result = CombatService.executeRogueDualStrike(
+          char,
+          ability,
+          target,
+          aliveEnemies,
+        );
+        dualStrikeLog = result.log;
+        dualStrikeTargetId = result.targetId;
+        dualStrikeDamage = result.damage;
+        log += ' ${dualStrikeLog}';
+      }
+    }
+
     // Chaotic bounce: 50% chance to hit another random enemy
     if (ability.chaotic) {
       final aliveEnemies = _combat!.enemies.where((e) => e.isAlive).toList();
       if (aliveEnemies.isNotEmpty && Random().nextInt(100) < 50) {
-        final bounceTarget = aliveEnemies[Random().nextInt(aliveEnemies.length)];
-        log += ' ${CombatService.executeChaoticBounce(char, ability, bounceTarget)}';
+        final bounceTarget =
+            aliveEnemies[Random().nextInt(aliveEnemies.length)];
+        log +=
+            ' ${CombatService.executeChaoticBounce(char, ability, bounceTarget)}';
       }
     }
 
     // Snapshot HP after main attack (before pierce) for line splitting
     final enemyHpAfterMain = {
-      for (final e in _combat!.enemies) e.id: e.currentHp
+      for (final e in _combat!.enemies) e.id: e.currentHp,
     };
 
     // Ranger pierce: 15% chance to hit another (or same) enemy
@@ -366,34 +487,70 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       if (totalDmg > 0) {
         final aliveAllies = _combat!.allies.where((a) => a.isAlive).toList();
         if (aliveAllies.isNotEmpty) {
-          final injured = aliveAllies.reduce((a, b) =>
-            (a.currentHp / a.totalMaxHp) < (b.currentHp / b.totalMaxHp) ? a : b);
+          final injured = aliveAllies.reduce(
+            (a, b) =>
+                (a.currentHp / a.totalMaxHp) < (b.currentHp / b.totalMaxHp)
+                ? a
+                : b,
+          );
           final healAmt = max(1, (totalDmg * 0.15).round());
-          injured.currentHp = min(injured.totalMaxHp, injured.currentHp + healAmt);
+          injured.currentHp = min(
+            injured.totalMaxHp,
+            injured.currentHp + healAmt,
+          );
           log += ' ${injured.name} is healed for $healAmt by holy light!';
         }
       }
     }
 
     // Artificer: 35% chance to preserve ability (not consume refresh)
-    if (char.characterClass == CharacterClass.artificer && !ability.isBasicAttack && !ability.isAvailable) {
+    if (char.characterClass == CharacterClass.artificer &&
+        !ability.isBasicAttack &&
+        !ability.isAvailable) {
       if (Random().nextInt(100) < 35) {
         ability.isAvailable = true;
         log += ' ${char.name}\'s ingenuity preserves ${ability.name}!';
       }
     }
 
+    final SpellType attackSpellType =
+        char.characterClass == CharacterClass.wizard && !ability.isBasicAttack
+        ? _getSpellType(ability)
+        : SpellType.normal;
+
     // Build attack lines from HP diffs (main attack only, using pre-pierce snapshot)
     final isSpell = !ability.isBasicAttack;
     final lines = <_AttackLineData>[];
     for (final e in _combat!.enemies) {
       final diff = enemyHpBefore[e.id]! - enemyHpAfterMain[e.id]!;
-      if (diff > 0) lines.add(_AttackLineData(char.id, e.id, diff, false, isSpell));
+      if (diff > 0) {
+        final raw = rawDamageByEnemy[e.id] ?? diff;
+        final overkill = max(0, raw - diff);
+        lines.add(
+          _AttackLineData(
+            char.id,
+            e.id,
+            diff,
+            false,
+            isSpell,
+            spellType: attackSpellType,
+            overkill: overkill,
+          ),
+        );
+      }
     }
 
     // Add bounce line for pierce (from original target to pierce target)
     if (pierceTargetId != null && pierceDamage > 0) {
-      lines.add(_AttackLineData(pierceSourceId!, pierceTargetId, pierceDamage, false, false));
+      lines.add(
+        _AttackLineData(
+          pierceSourceId!,
+          pierceTargetId,
+          pierceDamage,
+          false,
+          false,
+        ),
+      );
     }
     for (final a in _combat!.allies) {
       final diff = a.currentHp - allyHpBefore[a.id]!;
@@ -402,9 +559,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
 
     if (lines.isNotEmpty) {
       final isMagicUser = magicDamageClasses.contains(char.characterClass);
-      ref.read(audioProvider.notifier).playSfx(
-        isMagicUser ? SfxType.spellCast : SfxType.meleeHit,
-      );
+      ref
+          .read(audioProvider.notifier)
+          .playSfx(isMagicUser ? SfxType.spellCast : SfxType.meleeHit);
     }
 
     setState(() {
@@ -439,7 +596,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
 
     setState(() {
       _combat!.combatLog.add(
-          '${char.name} uses a Health Potion on ${target.name}! (+$actualHeal HP)');
+        '${char.name} uses a Health Potion on ${target.name}! (+$actualHeal HP)',
+      );
       _attackLines = lines;
       _waitingForInput = false;
       _potionMode = false;
@@ -464,15 +622,17 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
   void _onCombatEnd() {
     if (_combat == null) return;
     if (_combat!.isVictory) {
-      final totalXp =
-          _combat!.enemies.fold(0, (sum, e) => sum + e.xpReward);
-      final totalGold =
-          _combat!.enemies.fold(0, (sum, e) => sum + e.goldReward);
+      final totalXp = _combat!.enemies.fold(0, (sum, e) => sum + e.xpReward);
+      final totalGold = _combat!.enemies.fold(
+        0,
+        (sum, e) => sum + e.goldReward,
+      );
       final notifier = ref.read(gameStateProvider.notifier);
 
       // Determine if this was a boss fight
       final gameState = ref.read(gameStateProvider);
-      final isBoss = gameState != null &&
+      final isBoss =
+          gameState != null &&
           gameState.currentMap.currentNode.type == NodeType.boss;
 
       // Track killed enemy types for LP calculation
@@ -528,8 +688,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
 
     final current = _combat!.currentCombatant;
     final char = _combat!.allies.firstWhere((c) => c.id == current.id);
-    final abilities =
-        char.abilities.where((a) => a.unlockedAtLevel <= char.level).toList();
+    final abilities = char.abilities
+        .where((a) => a.unlockedAtLevel <= char.level)
+        .toList();
 
     int? index;
     if (event.logicalKey == LogicalKeyboardKey.digit1) index = 0;
@@ -586,7 +747,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     final enemyIdx = _combat!.enemies.indexWhere((e) => e.id == id);
     if (enemyIdx >= 0) {
       final enemies = _combat!.enemies;
-      final totalCols = enemies.length <= 3 ? 1 : enemies.length <= 6 ? 2 : 3;
+      final totalCols = enemies.length <= 3
+          ? 1
+          : enemies.length <= 6
+          ? 2
+          : 3;
       final rowsPerCol = (enemies.length / totalCols).ceil();
       final gridCol = enemyIdx ~/ rowsPerCol;
       final gridRow = enemyIdx % rowsPerCol;
@@ -612,64 +777,65 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     final theme = Theme.of(context);
 
     if (_combat == null) {
-      return const Scaffold(
-          body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final currentCombatant =
-        _combat!.isComplete ? null : _combat!.currentCombatant;
+    final currentCombatant = _combat!.isComplete
+        ? null
+        : _combat!.currentCombatant;
 
     return KeyboardListener(
       focusNode: _focusNode,
       autofocus: true,
       onKeyEvent: _handleKeyPress,
       child: Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(theme, currentCombatant),
-            Expanded(
-              flex: 4,
-              child: _buildBattlefield(theme, currentCombatant),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              flex: 1,
-              child: Container(
-                color: theme.colorScheme.surfaceContainerLowest,
-                child: ListView.builder(
-                  controller: _logController,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 4),
-                  itemCount: _combat!.combatLog.length,
-                  itemBuilder: (context, index) {
-                    final text = _combat!.combatLog[index];
-                    final isRoundHeader = text.startsWith('---');
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 1),
-                      child: Text(
-                        text,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight:
-                              isRoundHeader ? FontWeight.bold : null,
-                          color: isRoundHeader
-                              ? theme.colorScheme.primary
-                              : null,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(theme, currentCombatant),
+              Expanded(
+                flex: 4,
+                child: _buildBattlefield(theme, currentCombatant),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                flex: 1,
+                child: Container(
+                  color: theme.colorScheme.surfaceContainerLowest,
+                  child: ListView.builder(
+                    controller: _logController,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    itemCount: _combat!.combatLog.length,
+                    itemBuilder: (context, index) {
+                      final text = _combat!.combatLog[index];
+                      final isRoundHeader = text.startsWith('---');
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 1),
+                        child: Text(
+                          text,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: isRoundHeader ? FontWeight.bold : null,
+                            color: isRoundHeader
+                                ? theme.colorScheme.primary
+                                : null,
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-            if (_waitingForInput && !_combat!.isComplete)
-              _buildAbilityBar(theme)
-            else if (_combat!.isComplete)
-              _buildCombatEndBar(theme),
-          ],
+              if (_waitingForInput && !_combat!.isComplete)
+                _buildAbilityBar(theme)
+              else if (_combat!.isComplete)
+                _buildCombatEndBar(theme),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -688,8 +854,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                 child: Text(
                   'Round ${_combat!.roundNumber}',
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const SizedBox(width: 40, child: HelpButton()),
@@ -705,17 +872,21 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                 return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 2),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: isCurrent
                         ? theme.colorScheme.primary
                         : entry.isAlly
-                            ? theme.colorScheme.primaryContainer
-                            : theme.colorScheme.errorContainer,
+                        ? theme.colorScheme.primaryContainer
+                        : theme.colorScheme.errorContainer,
                     borderRadius: BorderRadius.circular(12),
                     border: isCurrent
                         ? Border.all(
-                            color: theme.colorScheme.onPrimary, width: 2)
+                            color: theme.colorScheme.onPrimary,
+                            width: 2,
+                          )
                         : null,
                   ),
                   child: Text(
@@ -724,8 +895,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                       color: isCurrent
                           ? theme.colorScheme.onPrimary
                           : entry.isAlly
-                              ? theme.colorScheme.onPrimaryContainer
-                              : theme.colorScheme.onErrorContainer,
+                          ? theme.colorScheme.onPrimaryContainer
+                          : theme.colorScheme.onErrorContainer,
                       fontWeight: isCurrent ? FontWeight.bold : null,
                     ),
                   ),
@@ -739,12 +910,10 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
   }
 
   // -- Battlefield ----------------------------------------------------------
-  Widget _buildBattlefield(
-      ThemeData theme, CombatantEntry? currentCombatant) {
+  Widget _buildBattlefield(ThemeData theme, CombatantEntry? currentCombatant) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final bfSize =
-            Size(constraints.maxWidth, constraints.maxHeight);
+        final bfSize = Size(constraints.maxWidth, constraints.maxHeight);
 
         return Stack(
           children: [
@@ -770,8 +939,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             ),
             // Slight dim for readability
             Positioned.fill(
-              child: Container(
-                  color: Colors.black.withValues(alpha: 0.15)),
+              child: Container(color: Colors.black.withValues(alpha: 0.15)),
             ),
 
             // Combatants row
@@ -782,24 +950,29 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          vertical: 8, horizontal: 4),
+                        vertical: 8,
+                        horizontal: 4,
+                      ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: _combat!.allies.map((ally) {
-                          final isCurrentTurn =
-                              currentCombatant?.id == ally.id;
-                          final isHealTarget = (_selectedAbility != null &&
-                              _selectedAbility!.damage < 0 &&
-                              _selectedAbility!.targetType ==
-                                  AbilityTarget.singleAlly &&
-                              ally.isAlive) ||
+                          final isCurrentTurn = currentCombatant?.id == ally.id;
+                          final isHealTarget =
+                              (_selectedAbility != null &&
+                                  _selectedAbility!.damage < 0 &&
+                                  _selectedAbility!.targetType ==
+                                      AbilityTarget.singleAlly &&
+                                  ally.isAlive) ||
                               (_potionMode && ally.isAlive);
                           return Flexible(
                             child: GestureDetector(
                               onTap: isHealTarget || ref.read(helpModeProvider)
                                   ? () {
                                       if (ref.read(helpModeProvider)) {
-                                        ref.read(helpModeProvider.notifier).state = false;
+                                        ref
+                                                .read(helpModeProvider.notifier)
+                                                .state =
+                                            false;
                                         showCharacterHelp(context, ally);
                                         return;
                                       }
@@ -811,7 +984,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                                     }
                                   : null,
                               child: _buildAllyWidget(
-                                  theme, ally, isCurrentTurn, isHealTarget),
+                                theme,
+                                ally,
+                                isCurrentTurn,
+                                isHealTarget,
+                              ),
                             ),
                           );
                         }).toList(),
@@ -822,7 +999,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          vertical: 8, horizontal: 4),
+                        vertical: 8,
+                        horizontal: 4,
+                      ),
                       child: _buildEnemyGrid(theme),
                     ),
                   ),
@@ -853,7 +1032,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
   // -- Enemy grid (up to 3x3) ------------------------------------------------
   Widget _buildEnemyGrid(ThemeData theme) {
     final enemies = _combat!.enemies;
-    final cols = enemies.length <= 3 ? 1 : enemies.length <= 6 ? 2 : 3;
+    final cols = enemies.length <= 3
+        ? 1
+        : enemies.length <= 6
+        ? 2
+        : 3;
     final rows = (enemies.length / cols).ceil();
 
     // Split enemies into grid columns
@@ -867,228 +1050,237 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     }
 
     return Row(
-      children: gridCols.map((colEnemies) => Expanded(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: colEnemies.map((enemy) {
-            final isTarget = _selectedAbility != null &&
-                _selectedAbility!.damage > 0 &&
-                _selectedAbility!.targetType == AbilityTarget.singleEnemy &&
-                enemy.isAlive;
-            return Flexible(
-              child: GestureDetector(
-                onTap: isTarget || ref.read(helpModeProvider)
-                    ? () {
-                        if (ref.read(helpModeProvider)) {
-                          ref.read(helpModeProvider.notifier).state = false;
-                          showEnemyHelp(context, enemy);
-                          return;
-                        }
-                        _useAbility(_selectedAbility!, enemy);
-                      }
-                    : null,
-                child: _buildEnemyWidget(theme, enemy, isTarget),
+      children: gridCols
+          .map(
+            (colEnemies) => Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: colEnemies.map((enemy) {
+                  final isTarget =
+                      _selectedAbility != null &&
+                      _selectedAbility!.damage > 0 &&
+                      _selectedAbility!.targetType ==
+                          AbilityTarget.singleEnemy &&
+                      enemy.isAlive;
+                  return Flexible(
+                    child: GestureDetector(
+                      onTap: isTarget || ref.read(helpModeProvider)
+                          ? () {
+                              if (ref.read(helpModeProvider)) {
+                                ref.read(helpModeProvider.notifier).state =
+                                    false;
+                                showEnemyHelp(context, enemy);
+                                return;
+                              }
+                              _useAbility(_selectedAbility!, enemy);
+                            }
+                          : null,
+                      child: _buildEnemyWidget(theme, enemy, isTarget),
+                    ),
+                  );
+                }).toList(),
               ),
-            );
-          }).toList(),
-        ),
-      )).toList(),
+            ),
+          )
+          .toList(),
     );
   }
 
   // -- Ally widget (vertical: name, sprite, hp bar, hp text) ----------------
-  Widget _buildAllyWidget(ThemeData theme, Character ally,
-      bool isCurrentTurn, bool isHealTarget) {
+  Widget _buildAllyWidget(
+    ThemeData theme,
+    Character ally,
+    bool isCurrentTurn,
+    bool isHealTarget,
+  ) {
     final spriteSize = _spriteSize(_combat!.allies.length);
     final spritePath = classSpritePath(ally.characterClass);
 
     return FittedBox(
       fit: BoxFit.scaleDown,
       child: AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: isCurrentTurn
-            ? Border.all(color: theme.colorScheme.primary, width: 2)
-            : isHealTarget
-                ? Border.all(color: Colors.green, width: 2)
-                : null,
-        color: isCurrentTurn
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
-            : isHealTarget
-                ? Colors.green.withValues(alpha: 0.15)
-                : null,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            ally.name.split(' ').first,
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
-              decoration:
-                  ally.isAlive ? null : TextDecoration.lineThrough,
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: isCurrentTurn
+              ? Border.all(color: theme.colorScheme.primary, width: 2)
+              : isHealTarget
+              ? Border.all(color: Colors.green, width: 2)
+              : null,
+          color: isCurrentTurn
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
+              : isHealTarget
+              ? Colors.green.withValues(alpha: 0.15)
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              ally.name.split(' ').first,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
+                decoration: ally.isAlive ? null : TextDecoration.lineThrough,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Flexible(
-            child: Opacity(
-              opacity: ally.isAlive ? 1.0 : 0.3,
-              child: IdleAnimatedSprite(
-                imagePath: spritePath,
-                size: spriteSize,
-                phaseOffset: ally.id.hashCode.toDouble(),
-                animate: ally.isAlive,
+            const SizedBox(height: 2),
+            Flexible(
+              child: Opacity(
+                opacity: ally.isAlive ? 1.0 : 0.3,
+                child: IdleAnimatedSprite(
+                  imagePath: spritePath,
+                  size: spriteSize,
+                  phaseOffset: ally.id.hashCode.toDouble(),
+                  animate: ally.isAlive,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 2),
-          if (ally.isAlive) ...[
-            SizedBox(
-              width: spriteSize,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (ally.shieldHp > 0)
+            const SizedBox(height: 2),
+            if (ally.isAlive) ...[
+              SizedBox(
+                width: spriteSize,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (ally.shieldHp > 0)
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(3),
+                        ),
+                        child: LinearProgressIndicator(
+                          value: (ally.shieldHp / ally.totalMaxHp).clamp(
+                            0.0,
+                            1.0,
+                          ),
+                          minHeight: 4,
+                          color: Colors.cyan.shade300,
+                          backgroundColor: Colors.cyan.shade900.withValues(
+                            alpha: 0.3,
+                          ),
+                        ),
+                      ),
                     ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                      borderRadius: ally.shieldHp > 0
+                          ? const BorderRadius.vertical(
+                              bottom: Radius.circular(3),
+                            )
+                          : BorderRadius.circular(3),
                       child: LinearProgressIndicator(
-                        value: (ally.shieldHp / ally.totalMaxHp).clamp(0.0, 1.0),
-                        minHeight: 4,
-                        color: Colors.cyan.shade300,
-                        backgroundColor: Colors.cyan.shade900.withValues(alpha: 0.3),
+                        value: ally.currentHp / ally.totalMaxHp,
+                        minHeight: 5,
+                        color: _hpColor(ally.currentHp / ally.totalMaxHp),
+                        backgroundColor: Colors.black45,
                       ),
                     ),
-                  ClipRRect(
-                    borderRadius: ally.shieldHp > 0
-                        ? const BorderRadius.vertical(bottom: Radius.circular(3))
-                        : BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: ally.currentHp / ally.totalMaxHp,
-                      minHeight: 5,
-                      color: _hpColor(ally.currentHp / ally.totalMaxHp),
-                      backgroundColor: Colors.black45,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Text(
-              ally.shieldHp > 0
-                  ? '${ally.currentHp}/${ally.totalMaxHp} +${ally.shieldHp}'
-                  : '${ally.currentHp}/${ally.totalMaxHp}',
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontSize: 9,
-                color: ally.shieldHp > 0 ? Colors.cyan.shade200 : Colors.white,
-                shadows: const [
-                  Shadow(color: Colors.black, blurRadius: 2)
-                ],
+              Text(
+                ally.shieldHp > 0
+                    ? '${ally.currentHp}/${ally.totalMaxHp} +${ally.shieldHp}'
+                    : '${ally.currentHp}/${ally.totalMaxHp}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontSize: 9,
+                  color: ally.shieldHp > 0
+                      ? Colors.cyan.shade200
+                      : Colors.white,
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 2)],
+                ),
               ),
-            ),
-          ] else
-            Text(
-              'KO',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-                shadows: const [
-                  Shadow(color: Colors.black, blurRadius: 2)
-                ],
+            ] else
+              Text(
+                'KO',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 2)],
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 
   // -- Enemy widget (vertical layout, same as ally) -------------------------
-  Widget _buildEnemyWidget(
-      ThemeData theme, Enemy enemy, bool isTarget) {
+  Widget _buildEnemyWidget(ThemeData theme, Enemy enemy, bool isTarget) {
     final spriteSize = _spriteSize(_combat!.enemies.length);
     final spritePath = enemySpritePathByName(enemy.name);
 
     return FittedBox(
       fit: BoxFit.scaleDown,
       child: AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        border: isTarget
-            ? Border.all(color: Colors.red, width: 2)
-            : null,
-        color: isTarget
-            ? theme.colorScheme.errorContainer.withValues(alpha: 0.4)
-            : null,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            enemy.name,
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
-              decoration:
-                  enemy.isAlive ? null : TextDecoration.lineThrough,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Flexible(
-            child: Opacity(
-              opacity: enemy.isAlive ? 1.0 : 0.3,
-              child: IdleAnimatedSprite(
-                imagePath: spritePath,
-                size: spriteSize,
-                phaseOffset: enemy.id.hashCode.toDouble(),
-                animate: enemy.isAlive,
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: isTarget ? Border.all(color: Colors.red, width: 2) : null,
+          color: isTarget
+              ? theme.colorScheme.errorContainer.withValues(alpha: 0.4)
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              enemy.name,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
+                decoration: enemy.isAlive ? null : TextDecoration.lineThrough,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          const SizedBox(height: 2),
-          if (enemy.isAlive) ...[
-            SizedBox(
-              width: spriteSize,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: LinearProgressIndicator(
-                  value: enemy.currentHp / enemy.maxHp,
-                  minHeight: 5,
-                  color: Colors.red,
-                  backgroundColor: Colors.black45,
+            const SizedBox(height: 2),
+            Flexible(
+              child: Opacity(
+                opacity: enemy.isAlive ? 1.0 : 0.3,
+                child: IdleAnimatedSprite(
+                  imagePath: spritePath,
+                  size: spriteSize,
+                  phaseOffset: enemy.id.hashCode.toDouble(),
+                  animate: enemy.isAlive,
                 ),
               ),
             ),
-            Text(
-              '${enemy.currentHp}/${enemy.maxHp}',
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontSize: 9,
-                color: Colors.white,
-                shadows: const [
-                  Shadow(color: Colors.black, blurRadius: 2)
-                ],
+            const SizedBox(height: 2),
+            if (enemy.isAlive) ...[
+              SizedBox(
+                width: spriteSize,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: enemy.currentHp / enemy.maxHp,
+                    minHeight: 5,
+                    color: Colors.red,
+                    backgroundColor: Colors.black45,
+                  ),
+                ),
               ),
-            ),
-          ] else
-            Text(
-              'Defeated',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: Colors.grey,
-                shadows: const [
-                  Shadow(color: Colors.black, blurRadius: 2)
-                ],
+              Text(
+                '${enemy.currentHp}/${enemy.maxHp}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontSize: 9,
+                  color: Colors.white,
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 2)],
+                ),
               ),
-            ),
-        ],
+            ] else
+              Text(
+                'Defeated',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: Colors.grey,
+                  shadows: const [Shadow(color: Colors.black, blurRadius: 2)],
+                ),
+              ),
+          ],
+        ),
       ),
-    ),
     );
   }
 
@@ -1104,16 +1296,19 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
   Widget _buildAbilityBar(ThemeData theme) {
     final current = _combat!.currentCombatant;
     final char = _combat!.allies.firstWhere((c) => c.id == current.id);
-    final abilities =
-        char.abilities.where((a) => a.unlockedAtLevel <= char.level).toList();
+    final abilities = char.abilities
+        .where((a) => a.unlockedAtLevel <= char.level)
+        .toList();
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHigh,
         border: Border(
-            top: BorderSide(
-                color: theme.colorScheme.outline.withValues(alpha: 0.3))),
+          top: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.3),
+          ),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1135,10 +1330,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                   _potionMode
                       ? '${char.name} - Choose potion target'
                       : _selectedAbility == null
-                          ? '${char.name} - Choose ability'
-                          : '${char.name} - Choose target',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                      ? '${char.name} - Choose ability'
+                      : '${char.name} - Choose target',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -1153,7 +1349,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                 if ((ref.read(gameStateProvider)?.healthPotions ?? 0) > 0)
                   _buildAbilityBox(
                     theme: theme,
-                    label: 'Potion (${ref.read(gameStateProvider)!.healthPotions})',
+                    label:
+                        'Potion (${ref.read(gameStateProvider)!.healthPotions})',
                     iconWidget: Icon(
                       Icons.local_drink,
                       size: 96,
@@ -1183,8 +1380,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                 ...abilities.asMap().entries.map((entry) {
                   final index = entry.key;
                   final ability = entry.value;
-                  final isSelected =
-                      _selectedAbility?.name == ability.name;
+                  final isSelected = _selectedAbility?.name == ability.name;
                   final canUse = ability.isAvailable;
 
                   return _buildAbilityBox(
@@ -1196,8 +1392,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                       width: 128,
                       height: 128,
                       filterQuality: FilterQuality.none,
-                      errorBuilder: (context, error, stackTrace) =>
-                          Icon(
+                      errorBuilder: (context, error, stackTrace) => Icon(
                         ability.damage < 0
                             ? Icons.favorite
                             : Icons.auto_awesome,
@@ -1217,13 +1412,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                               _selectedAbility = ability;
                               _potionMode = false;
                             });
-                            if (ability.targetType ==
-                                AbilityTarget.self) {
+                            if (ability.targetType == AbilityTarget.self) {
                               _useAbility(ability, char);
                             } else if (ability.targetType ==
                                     AbilityTarget.allEnemies ||
-                                ability.targetType ==
-                                    AbilityTarget.allAllies) {
+                                ability.targetType == AbilityTarget.allAllies) {
                               _useAbility(ability, null);
                             } else if (ability.minTargets > 0) {
                               _useAbility(ability, null);
@@ -1270,15 +1463,15 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     final bgColor = isSelected
         ? (selectedColor ?? theme.colorScheme.primary)
         : !canUse
-            ? theme.colorScheme.surfaceContainerHighest
-            : theme.colorScheme.surfaceContainerHigh;
+        ? theme.colorScheme.surfaceContainerHighest
+        : theme.colorScheme.surfaceContainerHigh;
     final fgColor = isSelected
         ? (selectedColor != null
-            ? theme.colorScheme.onTertiary
-            : theme.colorScheme.onPrimary)
+              ? theme.colorScheme.onTertiary
+              : theme.colorScheme.onPrimary)
         : !canUse
-            ? theme.colorScheme.onSurface.withValues(alpha: 0.4)
-            : theme.colorScheme.onSurface;
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.4)
+        : theme.colorScheme.onSurface;
 
     return GestureDetector(
       onTap: onTap,
@@ -1287,102 +1480,100 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-          Container(
-          width: 170,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color.lerp(bgColor, Colors.white, 0.15)!,
-                bgColor,
-                Color.lerp(bgColor, Colors.black, 0.15)!,
-              ],
-              stops: const [0.0, 0.4, 1.0],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? (selectedColor ?? theme.colorScheme.primary)
-                  : theme.colorScheme.outline.withValues(alpha: 0.5),
-              width: isSelected ? 3 : 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (isSelected
-                    ? (selectedColor ?? theme.colorScheme.primary)
-                    : Colors.black)
-                    .withValues(alpha: 0.4),
-                blurRadius: isSelected ? 8 : 4,
-                offset: const Offset(0, 3),
-              ),
-              if (isSelected)
-                BoxShadow(
-                  color: (selectedColor ?? theme.colorScheme.primary)
-                      .withValues(alpha: 0.2),
-                  blurRadius: 12,
-                  spreadRadius: 1,
-                ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: fgColor,
-                  height: 1.2,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              SizedBox(
-                width: 128,
-                height: 128,
-                child: FittedBox(
-                  fit: BoxFit.contain,
-                  child: iconWidget,
-                ),
-              ),
-            ],
-          ),
-        ),
-          if (keyNumber != null)
-            Positioned(
-              top: -4,
-              left: -4,
-              child: Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
-                  borderRadius: BorderRadius.circular(6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
+            Container(
+              width: 170,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color.lerp(bgColor, Colors.white, 0.15)!,
+                    bgColor,
+                    Color.lerp(bgColor, Colors.black, 0.15)!,
                   ],
+                  stops: const [0.0, 0.4, 1.0],
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$keyNumber',
-                  style: TextStyle(
-                    color: theme.colorScheme.onPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isSelected
+                      ? (selectedColor ?? theme.colorScheme.primary)
+                      : theme.colorScheme.outline.withValues(alpha: 0.5),
+                  width: isSelected ? 3 : 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        (isSelected
+                                ? (selectedColor ?? theme.colorScheme.primary)
+                                : Colors.black)
+                            .withValues(alpha: 0.4),
+                    blurRadius: isSelected ? 8 : 4,
+                    offset: const Offset(0, 3),
+                  ),
+                  if (isSelected)
+                    BoxShadow(
+                      color: (selectedColor ?? theme.colorScheme.primary)
+                          .withValues(alpha: 0.2),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: fgColor,
+                      height: 1.2,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: 128,
+                    height: 128,
+                    child: FittedBox(fit: BoxFit.contain, child: iconWidget),
+                  ),
+                ],
+              ),
+            ),
+            if (keyNumber != null)
+              Positioned(
+                top: -4,
+                left: -4,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '$keyNumber',
+                    style: TextStyle(
+                      color: theme.colorScheme.onPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -1410,8 +1601,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             Text(
               '+${_combat!.enemies.fold(0, (sum, e) => sum + e.xpReward)} XP  '
               '+${_combat!.enemies.fold(0, (sum, e) => sum + e.goldReward)} Gold',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ] else
             Text(
@@ -1460,36 +1652,55 @@ class _AttackLinePainter extends CustomPainter {
     for (final line in lines) {
       final from = positionOf(line.attackerId);
       final to = positionOf(line.targetId);
-      _paintLine(canvas, from, to, line.amount, line.isHealing, line.isSpell);
+      _paintLine(canvas, from, to, line);
     }
   }
 
-  void _paintLine(
-      Canvas canvas, Offset from, Offset to, int amount, bool isHealing, bool isSpell) {
-    final Color color;
-    if (isHealing) {
-      color = const Color(0xFF4CAF50);
-    } else if (isSpell) {
-      color = const Color(0xFF7C4DFF);
+  void _paintLine(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    if (line.spellType == SpellType.normal || line.isHealing) {
+      _paintStandardLine(canvas, from, to, line);
     } else {
-      color = const Color(0xFFFF5722);
+      switch (line.spellType) {
+        case SpellType.burningHands:
+          _paintBurningHands(canvas, from, to, line);
+          break;
+        case SpellType.fireball:
+          _paintFireball(canvas, from, to, line);
+          break;
+        case SpellType.iceStorm:
+          _paintIceStorm(canvas, from, to, line);
+          break;
+        case SpellType.chainLightning:
+          _paintChainLightning(canvas, from, to, line);
+          break;
+        case SpellType.meteor:
+          _paintMeteor(canvas, from, to, line);
+          break;
+        case SpellType.normal:
+          _paintStandardLine(canvas, from, to, line);
+          break;
+      }
     }
+  }
 
-    // Current end point based on progress
+  void _paintStandardLine(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
+    final Color color = line.isHealing
+        ? const Color(0xFF4CAF50)
+        : const Color(0xFFFF5722);
     final currentTo = Offset(
       from.dx + (to.dx - from.dx) * progress,
       from.dy + (to.dy - from.dy) * progress,
     );
-
     final linePaint = Paint()
       ..color = color
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke;
-
-    // Draw the line up to current progress
     canvas.drawLine(from, currentTo, linePaint);
-
-    // Glowing tip at the leading edge
     if (progress < 1.0) {
       canvas.drawCircle(
         currentTo,
@@ -1497,36 +1708,416 @@ class _AttackLinePainter extends CustomPainter {
         Paint()..color = color.withValues(alpha: 0.7),
       );
     }
-
-    // Show damage label once line is past halfway
     if (progress > 0.5) {
-      final mid = Offset((from.dx + to.dx) / 2, (from.dy + to.dy) / 2);
-      final label = isHealing ? '+$amount' : '-$amount';
-      final labelOpacity = ((progress - 0.5) * 2).clamp(0.0, 1.0);
+      _drawDamageLabel(canvas, from, to, line.amount, line.isHealing, color,
+          overkill: line.overkill);
+    }
+  }
 
+  void _drawDamageLabel(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    int amount,
+    bool isHealing,
+    Color color, {
+    int overkill = 0,
+  }) {
+    final mid = Offset((from.dx + to.dx) / 2, (from.dy + to.dy) / 2);
+    final label = isHealing ? '+$amount' : '-$amount';
+    final overkillText = (!isHealing && overkill > 0) ? ' ($overkill overkill)' : '';
+    final labelOpacity = ((progress - 0.5) * 2).clamp(0.0, 1.0);
+    final tp = TextPainter(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: labelOpacity),
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              shadows: [Shadow(color: color, blurRadius: 4)],
+            ),
+          ),
+          if (overkillText.isNotEmpty)
+            TextSpan(
+              text: overkillText,
+              style: TextStyle(
+                color: const Color(0xFFFFD700).withValues(alpha: labelOpacity),
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                shadows: [Shadow(color: color, blurRadius: 4)],
+              ),
+            ),
+        ],
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final labelW = tp.width + 14;
+    final labelH = tp.height + 8;
+    final labelRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: mid, width: labelW, height: labelH),
+      const Radius.circular(4),
+    );
+    canvas.drawRRect(
+      labelRect,
+      Paint()..color = color.withValues(alpha: 0.9 * labelOpacity),
+    );
+    tp.paint(canvas, Offset(mid.dx - tp.width / 2, mid.dy - tp.height / 2));
+  }
+
+  void _paintBurningHands(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    final amount = line.amount;
+    final fireOrange = const Color(0xFFFF6600);
+    final fireYellow = const Color(0xFFFFD700);
+    final fireRed = const Color(0xFFCC2200);
+
+    final dx = to.dx - from.dx;
+    final dy = to.dy - from.dy;
+    final dist = sqrt(dx * dx + dy * dy);
+    if (dist == 0) return;
+    final dirX = dx / dist;
+    final dirY = dy / dist;
+    final perpX = -dirY;
+    final perpY = dirX;
+
+    final reach = progress.clamp(0.0, 1.0);
+    final currentDist = dist * reach;
+    final coneHalfWidth = 28.0;
+    final streamCount = 9;
+
+    for (int i = 0; i < streamCount; i++) {
+      final spread = (i / (streamCount - 1)) * 2.0 - 1.0;
+      final endX = from.dx + dirX * currentDist +
+          perpX * spread * coneHalfWidth * reach;
+      final endY = from.dy + dirY * currentDist +
+          perpY * spread * coneHalfWidth * reach;
+
+      // Wavy fire stream
+      final path = Path()..moveTo(from.dx, from.dy);
+      final segs = 8;
+      for (int s = 1; s <= segs; s++) {
+        final t = s / segs;
+        final baseX = from.dx + (endX - from.dx) * t;
+        final baseY = from.dy + (endY - from.dy) * t;
+        final wave = sin(t * pi * 4 + progress * 10 + i * 1.3) * 3 * t;
+        path.lineTo(baseX + perpX * wave, baseY + perpY * wave);
+      }
+
+      final colors = [fireRed, fireOrange, fireYellow];
+      final color = colors[i % 3];
+      final width = 2.0 + (1.0 - spread.abs()) * 2.5;
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = color.withValues(alpha: 0.8)
+          ..strokeWidth = width
+          ..style = PaintingStyle.stroke,
+      );
+
+      // Fire particles along each stream
+      if (reach > 0.3) {
+        final particleT = 0.4 + (i % 4) * 0.15;
+        if (particleT <= 1.0) {
+          final px = from.dx + (endX - from.dx) * particleT;
+          final py = from.dy + (endY - from.dy) * particleT;
+          canvas.drawCircle(
+            Offset(px, py),
+            2.5 + (1.0 - spread.abs()) * 2.5,
+            Paint()..color = fireYellow.withValues(alpha: 0.7),
+          );
+        }
+      }
+    }
+
+    // Glow at wizard's hands
+    canvas.drawCircle(
+      from, 10,
+      Paint()..color = fireOrange.withValues(alpha: 0.3 * reach),
+    );
+    canvas.drawCircle(
+      from, 6,
+      Paint()..color = fireYellow.withValues(alpha: 0.5 * reach),
+    );
+
+    if (progress > 0.5) {
+      _drawDamageLabel(canvas, from, to, amount, false, fireOrange,
+          overkill: line.overkill);
+    }
+  }
+
+  void _paintFireball(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    final amount = line.amount;
+    final darkRed = const Color(0xFF8B0000);
+    final red = const Color(0xFFD60000);
+    final yellow = const Color(0xFFFFD700);
+    final progressPct = progress.clamp(0.0, 1.0);
+    final currentTo = Offset(
+      from.dx + (to.dx - from.dx) * progressPct,
+      from.dy + (to.dy - from.dy) * progressPct,
+    );
+    final ballRadius = 6.0 + (progressPct * 12.0);
+    // Outer dark ring
+    canvas.drawCircle(currentTo, ballRadius, Paint()..color = darkRed);
+    // Mid red ball
+    canvas.drawCircle(currentTo, ballRadius * 0.7, Paint()..color = red);
+    // Inner yellow core
+    canvas.drawCircle(currentTo, ballRadius * 0.4, Paint()..color = yellow);
+    // Explosion at impact
+    if (progress >= 0.92) {
+      final expRadius = ballRadius * 2.2;
+      canvas.drawCircle(
+        currentTo,
+        expRadius,
+        Paint()..color = darkRed.withValues(alpha: 0.3),
+      );
+      canvas.drawCircle(
+        currentTo,
+        expRadius * 0.7,
+        Paint()..color = red.withValues(alpha: 0.5),
+      );
+      final overkillText = line.overkill > 0 ? ' (${line.overkill} overkill)' : '';
       final tp = TextPainter(
         text: TextSpan(
-          text: label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: labelOpacity),
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            shadows: [Shadow(color: color, blurRadius: 4)],
-          ),
+          children: [
+            TextSpan(
+              text: '-$amount',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                shadows: [Shadow(color: darkRed, blurRadius: 6)],
+              ),
+            ),
+            if (overkillText.isNotEmpty)
+              TextSpan(
+                text: overkillText,
+                style: TextStyle(
+                  color: const Color(0xFFFFD700),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  shadows: [Shadow(color: darkRed, blurRadius: 6)],
+                ),
+              ),
+          ],
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-
-      final labelW = tp.width + 14;
-      final labelH = tp.height + 8;
-
-      final labelRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: mid, width: labelW, height: labelH),
-        const Radius.circular(4),
-      );
       canvas.drawRRect(
-          labelRect, Paint()..color = color.withValues(alpha: 0.9 * labelOpacity));
-      tp.paint(canvas, Offset(mid.dx - tp.width / 2, mid.dy - tp.height / 2));
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: currentTo,
+            width: tp.width + 14,
+            height: tp.height + 8,
+          ),
+          const Radius.circular(4),
+        ),
+        Paint()..color = darkRed.withValues(alpha: 0.7),
+      );
+      tp.paint(
+        canvas,
+        Offset(currentTo.dx - tp.width / 2, currentTo.dy - tp.height / 2 - 15),
+      );
+    }
+  }
+
+  void _paintIceStorm(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    final amount = line.amount;
+    final iceBlue = const Color(0xFF00BFFF);
+    final iceCyan = const Color(0xFF00FFFF);
+    final iceWhite = const Color(0xFFE0F0FF);
+
+    // Ice chunks fall from the sky (above target) down to the target
+    final skyY = to.dy - 180;
+    final chunkCount = 9;
+
+    for (int i = 0; i < chunkCount; i++) {
+      // Stagger each chunk's start time
+      final delay = i * 0.07;
+      final chunkProgress = ((progress - delay) / (1.0 - delay)).clamp(0.0, 1.0);
+      if (chunkProgress <= 0) continue;
+
+      // Scatter horizontally around the target
+      final scatterX = (i - chunkCount ~/ 2) * 16.0 + (i.isEven ? 4 : -4);
+      final startX = to.dx + scatterX;
+      final startY = skyY + (i % 3) * 20.0;
+
+      // Fall straight down to target area
+      final chunkX = startX;
+      final chunkY = startY + (to.dy - startY) * chunkProgress;
+
+      // Draw angular ice crystal (diamond shape)
+      final size = 5.0 + (i % 3) * 3.0;
+      final path = Path()
+        ..moveTo(chunkX, chunkY - size)
+        ..lineTo(chunkX + size * 0.6, chunkY)
+        ..lineTo(chunkX, chunkY + size * 0.7)
+        ..lineTo(chunkX - size * 0.6, chunkY)
+        ..close();
+
+      final colors = [iceBlue, iceCyan, iceWhite];
+      canvas.drawPath(path, Paint()..color = colors[i % 3].withValues(alpha: 0.85));
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = iceWhite
+          ..strokeWidth = 1.0
+          ..style = PaintingStyle.stroke,
+      );
+
+      // Small trail above each falling chunk
+      if (chunkProgress < 0.9) {
+        canvas.drawLine(
+          Offset(chunkX, chunkY - size - 6),
+          Offset(chunkX, chunkY - size),
+          Paint()
+            ..color = iceCyan.withValues(alpha: 0.4)
+            ..strokeWidth = 1.5,
+        );
+      }
+    }
+
+    // Impact frost ring at target when chunks land
+    if (progress > 0.7) {
+      final impactProgress = ((progress - 0.7) / 0.3).clamp(0.0, 1.0);
+      canvas.drawCircle(
+        to,
+        18 * impactProgress,
+        Paint()
+          ..color = iceBlue.withValues(alpha: 0.3 * (1.0 - impactProgress))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0,
+      );
+    }
+
+    if (progress > 0.6) {
+      _drawDamageLabel(canvas, from, to, amount, false, iceBlue,
+          overkill: line.overkill);
+    }
+  }
+
+  void _paintChainLightning(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    final amount = line.amount;
+    final yellow = const Color(0xFFFFEB3B);
+    final black = Colors.black;
+    final xDiff = to.dx - from.dx;
+    final yDiff = to.dy - from.dy;
+    final currentProgress = progress.clamp(0.0, 1.0);
+    // Draw jagged lightning bolt
+    final points = <Offset>[from];
+    final segments = 5;
+    for (int i = 1; i < segments; i++) {
+      final t = i / segments;
+      final baseX = from.dx + xDiff * t;
+      final baseY = from.dy + yDiff * t;
+      final offset = (sin(currentProgress * 8.0 * pi + i) * 12 * (1 - t));
+      points.add(Offset(baseX + offset, baseY));
+    }
+    points.add(to);
+    // Black outline
+    for (int i = 0; i < points.length - 1; i++) {
+      canvas.drawLine(
+        points[i],
+        points[i + 1],
+        Paint()
+          ..color = black
+          ..strokeWidth = 4.0
+          ..style = PaintingStyle.stroke,
+      );
+    }
+    // Yellow core
+    for (int i = 0; i < points.length - 1; i++) {
+      canvas.drawLine(
+        points[i],
+        points[i + 1],
+        Paint()
+          ..color = yellow
+          ..strokeWidth = 2.0
+          ..style = PaintingStyle.stroke,
+      );
+    }
+    if (progress > 0.5) {
+      _drawDamageLabel(canvas, from, to, amount, false, yellow,
+          overkill: line.overkill);
+    }
+  }
+
+  void _paintMeteor(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+    final amount = line.amount;
+    final darkRed = const Color(0xFF8B0000);
+    final orangeRed = const Color(0xFFFF4500);
+    final gold = const Color(0xFFFFD700);
+    final currentTo = Offset(
+      from.dx + (to.dx - from.dx) * progress,
+      from.dy + (to.dy - from.dy) * progress,
+    );
+    final meteorSize = 8.0 + (progress * 18.0);
+    // Dark outer ring
+    canvas.drawCircle(currentTo, meteorSize, Paint()..color = darkRed);
+    // Orange mid layer
+    canvas.drawCircle(currentTo, meteorSize * 0.75, Paint()..color = orangeRed);
+    // Gold core
+    canvas.drawCircle(currentTo, meteorSize * 0.5, Paint()..color = gold);
+    // Explosion at impact
+    if (progress >= 0.95) {
+      final expRadius = meteorSize * 2.5;
+      canvas.drawCircle(
+        currentTo,
+        expRadius,
+        Paint()..color = darkRed.withValues(alpha: 0.25),
+      );
+      canvas.drawCircle(
+        currentTo,
+        expRadius * 0.7,
+        Paint()..color = orangeRed.withValues(alpha: 0.5),
+      );
+      canvas.drawCircle(
+        currentTo,
+        expRadius * 0.4,
+        Paint()..color = gold.withValues(alpha: 0.6),
+      );
+      final overkillText = line.overkill > 0 ? ' (${line.overkill} overkill)' : '';
+      final tp = TextPainter(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: '-$amount',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                shadows: [Shadow(color: darkRed, blurRadius: 8)],
+              ),
+            ),
+            if (overkillText.isNotEmpty)
+              TextSpan(
+                text: overkillText,
+                style: TextStyle(
+                  color: const Color(0xFFFFD700),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  shadows: [Shadow(color: darkRed, blurRadius: 8)],
+                ),
+              ),
+          ],
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: currentTo,
+            width: tp.width + 14,
+            height: tp.height + 8,
+          ),
+          const Radius.circular(4),
+        ),
+        Paint()..color = darkRed.withValues(alpha: 0.8),
+      );
+      tp.paint(
+        canvas,
+        Offset(currentTo.dx - tp.width / 2, currentTo.dy - tp.height / 2 - 20),
+      );
     }
   }
 

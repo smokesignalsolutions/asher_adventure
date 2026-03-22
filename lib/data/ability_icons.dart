@@ -22,9 +22,9 @@ const Map<String, String> abilityIconMap = {
   'Divine Wrath': 'holy_aoe',
 
   // Wizard
-  'Arcane Bolt': 'arcane',
+  'Burning Hands': 'fireball',
   'Fireball': 'fireball',
-  'Ice Lance': 'ice',
+  'Ice Storm': 'ice',
   'Chain Lightning': 'lightning',
   'Meteor': 'meteor',
 

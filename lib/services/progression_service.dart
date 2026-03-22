@@ -1,6 +1,5 @@
 import '../core/constants/game_constants.dart';
 import '../data/class_data.dart';
-import '../models/ability.dart';
 import '../models/character.dart';
 
 class ProgressionService {
@@ -34,15 +33,7 @@ class ProgressionService {
       if (ability.unlockedAtLevel == character.level) {
         final alreadyHas = character.abilities.any((a) => a.name == ability.name);
         if (!alreadyHas) {
-          character.abilities.add(Ability(
-            name: ability.name,
-            description: ability.description,
-            damage: ability.damage,
-            refreshChance: ability.refreshChance,
-            targetType: ability.targetType,
-            unlockedAtLevel: ability.unlockedAtLevel,
-            isBasicAttack: ability.isBasicAttack,
-          ));
+          character.abilities.add(ability.copyWith());
         }
       }
     }

@@ -6,6 +6,7 @@ import '../../../data/map_backgrounds.dart';
 import '../../../data/mutator_data.dart';
 import '../../../models/enums.dart';
 import '../../../models/map_node.dart';
+import '../../../models/game_state.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../services/progression_service.dart';
 import '../../../services/scouting_service.dart';
@@ -83,6 +84,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       appBar: AppBar(
         title: Text('Map ${gameState.currentMapNumber} of 8'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.flag),
+            tooltip: 'End Run',
+            onPressed: () => _confirmEndRun(),
+          ),
           const HelpButton(),
           const AudioMuteButton(),
           Padding(
@@ -101,66 +107,86 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ),
       body: Column(
         children: [
-          // Compact party HP bar
+          // Compact party HP bar with front/back line toggle
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: Row(
               children: gameState.party.map((c) {
                 return Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Column(
-                        children: [
-                          Text(
-                            c.name.split(' ').first,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
+                  child: GestureDetector(
+                    onTap: () => ref.read(gameStateProvider.notifier).toggleFrontLine(c.id),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Column(
+                          children: [
+                            Text(
+                              c.name.split(' ').first,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            'Lv ${c.level}',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: Colors.amber[300],
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: c.isFrontLine
+                                    ? Colors.orange.withValues(alpha: 0.3)
+                                    : Colors.blue.withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                c.isFrontLine ? 'Front' : 'Back',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontSize: 9,
+                                  color: c.isFrontLine ? Colors.orange[300] : Colors.blue[300],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          if (c.isAlive) ...[
+                            Text(
+                              'Lv ${c.level}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: Colors.amber[300],
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            if (c.isAlive) ...[
+                              LinearProgressIndicator(
+                                value: c.currentHp / c.totalMaxHp,
+                                color: c.currentHp / c.totalMaxHp > 0.5
+                                    ? Colors.green
+                                    : c.currentHp / c.totalMaxHp > 0.25
+                                        ? Colors.orange
+                                        : Colors.red,
+                              ),
+                              Text(
+                                '${c.currentHp}/${c.totalMaxHp}',
+                                style: theme.textTheme.labelSmall,
+                              ),
+                            ] else
+                              Text(
+                                'KO',
+                                style: theme.textTheme.labelSmall
+                                    ?.copyWith(color: Colors.red),
+                              ),
+                            const SizedBox(height: 2),
+                            // XP bar
                             LinearProgressIndicator(
-                              value: c.currentHp / c.totalMaxHp,
-                              color: c.currentHp / c.totalMaxHp > 0.5
-                                  ? Colors.green
-                                  : c.currentHp / c.totalMaxHp > 0.25
-                                      ? Colors.orange
-                                      : Colors.red,
+                              value: c.xp / ProgressionService.xpForLevel(c.level),
+                              backgroundColor: Colors.grey[800],
+                              color: Colors.blue[300],
+                              minHeight: 3,
                             ),
                             Text(
-                              '${c.currentHp}/${c.totalMaxHp}',
-                              style: theme.textTheme.labelSmall,
+                              '${c.xp}/${ProgressionService.xpForLevel(c.level)} XP',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontSize: 9,
+                                color: Colors.blue[200],
+                              ),
                             ),
-                          ] else
-                            Text(
-                              'KO',
-                              style: theme.textTheme.labelSmall
-                                  ?.copyWith(color: Colors.red),
-                            ),
-                          const SizedBox(height: 2),
-                          // XP bar
-                          LinearProgressIndicator(
-                            value: c.xp / ProgressionService.xpForLevel(c.level),
-                            backgroundColor: Colors.grey[800],
-                            color: Colors.blue[300],
-                            minHeight: 3,
-                          ),
-                          Text(
-                            '${c.xp}/${ProgressionService.xpForLevel(c.level)} XP',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              fontSize: 9,
-                              color: Colors.blue[200],
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -200,12 +226,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                           color: Colors.black.withValues(alpha: 0.35),
                         ),
                       ),
-                      // Connections, army wave overlay
+                      // Connections, army wave overlay (show where army will be next turn)
                       Positioned.fill(
                         child: CustomPaint(
                           painter: _MapPainter(
                             nodes: map.nodes,
-                            armyColumn: map.armyColumn,
+                            armyColumn: _previewArmyColumn(gameState),
                             currentNodeId: currentNode.id,
                           ),
                         ),
@@ -237,6 +263,54 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Preview where the army will be after the player's next move.
+  double _previewArmyColumn(GameState gameState) {
+    double armySpeed = 2.0;
+    switch (gameState.difficulty) {
+      case DifficultyLevel.easy:
+        armySpeed = 3.0;
+      case DifficultyLevel.normal:
+        armySpeed = 2.0;
+      case DifficultyLevel.hard:
+        armySpeed = 1.5;
+      case DifficultyLevel.nightmare:
+        armySpeed = 1.0;
+    }
+    final mutator = getMutatorEffect(gameState.activeMutator, 'army_speed');
+    armySpeed = armySpeed / mutator;
+
+    var accumulator = gameState.armyMoveAccumulator + 1.0;
+    var column = gameState.currentMap.armyColumn;
+    while (accumulator >= armySpeed) {
+      accumulator -= armySpeed;
+      column += 1.0;
+    }
+    return column;
+  }
+
+  void _confirmEndRun() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('End Run?'),
+        content: const Text('Are you sure you want to end this run? This counts as a defeat.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go('/game-over');
+            },
+            child: const Text('End Run'),
           ),
         ],
       ),

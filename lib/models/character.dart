@@ -54,6 +54,7 @@ class Character {
   int combatDefenseBonus; // flat defense bonus from abilities like Holy Guard
   List<String> activeSummons; // summoner: persistent summon IDs (combat-only)
   bool? lastAttackWasPhysical; // spellsword: track alternation (combat-only)
+  bool isFrontLine; // front line characters are targeted more often
 
   Character({
     required this.id,
@@ -75,6 +76,7 @@ class Character {
     this.combatDefenseBonus = 0,
     List<String>? activeSummons,
     this.lastAttackWasPhysical,
+    this.isFrontLine = true,
   }) : equipment = equipment ?? {
          for (var slot in EquipmentSlot.values) slot: null,
        },
@@ -130,6 +132,7 @@ class Character {
     },
     'shieldHp': shieldHp,
     'abilities': abilities.map((a) => a.toJson()).toList(),
+    'isFrontLine': isFrontLine,
   };
 
   factory Character.fromJson(Map<String, dynamic> json) {
@@ -157,6 +160,7 @@ class Character {
       abilities: (json['abilities'] as List)
           .map((a) => Ability.fromJson(a))
           .toList(),
+      isFrontLine: json['isFrontLine'] ?? true,
     );
   }
 }

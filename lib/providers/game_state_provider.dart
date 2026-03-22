@@ -36,6 +36,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     PlayerProfile? profile,
     String? activePerk,
     String? activeMutator,
+    bool testMode = false,
   }) async {
     NameGenerator.reset();
     final party = <Character>[];
@@ -44,19 +45,16 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       final classDef = classDefinitions[cls]!;
       final name = NameGenerator.generate(cls.name[0].toUpperCase() + cls.name.substring(1));
 
-      // Gather starting abilities (level 1)
-      final startingAbilities = classDef.abilities
-          .where((a) => a.unlockedAtLevel <= 1)
-          .map((a) => Ability(
-                name: a.name,
-                description: a.description,
-                damage: a.damage,
-                refreshChance: a.refreshChance,
-                targetType: a.targetType,
-                unlockedAtLevel: a.unlockedAtLevel,
-                isBasicAttack: a.isBasicAttack,
-              ))
-          .toList();
+      // Gather abilities — all in test mode, level 1 only otherwise
+      final startingAbilities = testMode
+          ? classDef.abilities.map((a) => a.copyWith(unlockedAtLevel: 1)).toList()
+          : classDef.abilities
+              .where((a) => a.unlockedAtLevel <= 1)
+              .map((a) => a.copyWith())
+              .toList();
+
+      // Melee classes default to front line, casters to back
+      final isFront = !magicDamageClasses.contains(cls);
 
       party.add(Character(
         id: _uuid.v4(),
@@ -69,6 +67,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
         speed: classDef.baseStats.speed,
         magic: classDef.baseStats.magic,
         abilities: startingAbilities,
+        isFrontLine: isFront,
       ));
     }
 
@@ -88,7 +87,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     // Calculate starting resources
     int startingGold = 0;
     int startingPotions = 0;
-    double armyStartColumn = -2.0;
+    double armyStartColumn = -1.0;
 
     if (profile != null) {
       startingPotions += profile.passiveBonuses['health_potion'] ?? 0;
@@ -443,15 +442,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     // Gather abilities for level 1
     final startingAbilities = classDef.abilities
         .where((a) => a.unlockedAtLevel <= 1)
-        .map((a) => Ability(
-              name: a.name,
-              description: a.description,
-              damage: a.damage,
-              refreshChance: a.refreshChance,
-              targetType: a.targetType,
-              unlockedAtLevel: a.unlockedAtLevel,
-              isBasicAttack: a.isBasicAttack,
-            ))
+        .map((a) => a.copyWith())
         .toList();
 
     final recruit = Character(
@@ -465,6 +456,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       speed: classDef.baseStats.speed,
       magic: classDef.baseStats.magic,
       abilities: startingAbilities,
+      isFrontLine: !magicDamageClasses.contains(cls),
     );
 
     // Level up to party average level
@@ -477,6 +469,14 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     state!.gold -= cost;
     state!.party.add(recruit);
+    state = _refreshState();
+    await _autoSave();
+  }
+
+  Future<void> toggleFrontLine(String charId) async {
+    if (state == null) return;
+    final char = state!.party.firstWhere((c) => c.id == charId);
+    char.isFrontLine = !char.isFrontLine;
     state = _refreshState();
     await _autoSave();
   }

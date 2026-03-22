@@ -18,7 +18,7 @@ final appRouter = GoRouter(
   initialLocation: '/',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const TitleScreen()),
-    GoRoute(path: '/party-select', builder: (context, state) => const PartySelectScreen()),
+    GoRoute(path: '/party-select', builder: (context, state) => PartySelectScreen(testMode: state.uri.queryParameters['testMode'] == 'true')),
     GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
     GoRoute(path: '/combat', builder: (context, state) => const CombatScreen()),
     GoRoute(path: '/shop', builder: (context, state) => const ShopScreen()),

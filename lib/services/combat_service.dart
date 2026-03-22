@@ -40,40 +40,48 @@ class CombatService {
   /// (or vice versa). Which side goes first is decided by comparing
   /// the best initiative roll from each side.
   static List<CombatantEntry> buildGroupedTurnOrder(
-      List<Character> party, List<Enemy> enemies) {
+    List<Character> party,
+    List<Enemy> enemies,
+  ) {
     final allyEntries = <CombatantEntry>[];
     final enemyEntries = <CombatantEntry>[];
 
     for (final char in party) {
       if (char.isAlive) {
-        allyEntries.add(CombatantEntry(
-          id: char.id,
-          name: char.name,
-          isAlly: true,
-          initiative: rollInitiative(
-            classDefinitions[char.characterClass]?.initiativeModifier ?? 0.0,
-            char.totalSpeed.toDouble(),
+        allyEntries.add(
+          CombatantEntry(
+            id: char.id,
+            name: char.name,
+            isAlly: true,
+            initiative: rollInitiative(
+              classDefinitions[char.characterClass]?.initiativeModifier ?? 0.0,
+              char.totalSpeed.toDouble(),
+            ),
           ),
-        ));
+        );
       }
     }
 
     for (final enemy in enemies) {
       if (enemy.isAlive) {
-        enemyEntries.add(CombatantEntry(
-          id: enemy.id,
-          name: enemy.name,
-          isAlly: false,
-          initiative: rollInitiative(0.0, enemy.speed.toDouble()),
-        ));
-        // Bosses act twice per round
-        if (enemy.type == 'boss') {
-          enemyEntries.add(CombatantEntry(
+        enemyEntries.add(
+          CombatantEntry(
             id: enemy.id,
             name: enemy.name,
             isAlly: false,
-            initiative: rollInitiative(0.0, enemy.speed.toDouble() * 0.5),
-          ));
+            initiative: rollInitiative(0.0, enemy.speed.toDouble()),
+          ),
+        );
+        // Bosses act twice per round
+        if (enemy.type == 'boss') {
+          enemyEntries.add(
+            CombatantEntry(
+              id: enemy.id,
+              name: enemy.name,
+              isAlly: false,
+              initiative: rollInitiative(0.0, enemy.speed.toDouble() * 0.5),
+            ),
+          );
         }
       }
     }
@@ -84,7 +92,9 @@ class CombatService {
 
     // Best roll from each side decides which group goes first
     final bestAlly = allyEntries.isEmpty ? 0.0 : allyEntries.first.initiative;
-    final bestEnemy = enemyEntries.isEmpty ? 0.0 : enemyEntries.first.initiative;
+    final bestEnemy = enemyEntries.isEmpty
+        ? 0.0
+        : enemyEntries.first.initiative;
 
     if (bestAlly >= bestEnemy) {
       return [...allyEntries, ...enemyEntries];
@@ -99,7 +109,15 @@ class CombatService {
     return _random.nextInt(100) < critChance;
   }
 
-  static (int damage, bool isCrit) calculateDamage(int attackStat, int abilityDamage, int targetDefense, {bool targetVulnerable = false, bool chaotic = false, double damageMultiplier = 1.0, int attackerSpeed = 0}) {
+  static (int damage, bool isCrit) calculateDamage(
+    int attackStat,
+    int abilityDamage,
+    int targetDefense, {
+    bool targetVulnerable = false,
+    bool chaotic = false,
+    double damageMultiplier = 1.0,
+    int attackerSpeed = 0,
+  }) {
     final raw = attackStat + abilityDamage - (targetDefense ~/ 2);
     final variance = chaotic
         ? 0.75 + _random.nextDouble() * 0.50
@@ -115,7 +133,12 @@ class CombatService {
     return (max(1, result), isCrit);
   }
 
-  static (int healing, bool isCrit) calculateHealing(int magicStat, int abilityHeal, {double healingMultiplier = 1.0, int casterSpeed = 0}) {
+  static (int healing, bool isCrit) calculateHealing(
+    int magicStat,
+    int abilityHeal, {
+    double healingMultiplier = 1.0,
+    int casterSpeed = 0,
+  }) {
     final raw = (magicStat ~/ 2) + abilityHeal.abs();
     final variance = 0.9 + _random.nextDouble() * 0.2;
     var result = max(1, (raw * variance * healingMultiplier).round());
@@ -141,12 +164,19 @@ class CombatService {
   }
 
   /// Chaotic bounce: hit a random enemy with the same ability
-  static String executeChaoticBounce(Character attacker, Ability ability, Enemy target) {
+  static String executeChaoticBounce(
+    Character attacker,
+    Ability ability,
+    Enemy target,
+  ) {
     final useMagic = magicDamageClasses.contains(attacker.characterClass);
     final offensiveStat = useMagic ? attacker.totalMagic : attacker.totalAttack;
     final (damage, isCrit) = calculateDamage(
-      offensiveStat, ability.damage, target.effectiveDefense,
-      targetVulnerable: target.isVulnerable, chaotic: true,
+      offensiveStat,
+      ability.damage,
+      target.effectiveDefense,
+      targetVulnerable: target.isVulnerable,
+      chaotic: true,
       attackerSpeed: attacker.totalSpeed,
     );
     target.currentHp = max(0, target.currentHp - damage);
@@ -159,12 +189,17 @@ class CombatService {
   /// Ranger pierce: re-roll damage against another (or same) enemy.
   /// Returns (log message, pierce target ID, damage dealt).
   static ({String log, String targetId, int damage}) executePierce(
-      Character attacker, Ability ability, List<Enemy> aliveEnemies) {
+    Character attacker,
+    Ability ability,
+    List<Enemy> aliveEnemies,
+  ) {
     if (aliveEnemies.isEmpty) return (log: '', targetId: '', damage: 0);
     final pierceTarget = aliveEnemies[_random.nextInt(aliveEnemies.length)];
     final offensiveStat = attacker.totalAttack;
     final (dmg, isCrit) = calculateDamage(
-      offensiveStat, ability.damage, pierceTarget.effectiveDefense,
+      offensiveStat,
+      ability.damage,
+      pierceTarget.effectiveDefense,
       targetVulnerable: pierceTarget.isVulnerable,
       attackerSpeed: attacker.totalSpeed,
     );
@@ -175,6 +210,50 @@ class CombatService {
     return (log: result, targetId: pierceTarget.id, damage: dmg);
   }
 
+  /// Rogue dual strike: 15% chance to execute ability a second time on a (possibly new) target
+  /// Returns (log message, target ID, damage dealt). For single-target abilities, if the
+  /// original target dies, a new random target is chosen for the second strike.
+  static ({String log, String targetId, int damage}) executeRogueDualStrike(
+    Character attacker,
+    Ability ability,
+    dynamic originalTarget,
+    List<Enemy> aliveEnemies,
+  ) {
+    if (aliveEnemies.isEmpty) return (log: '', targetId: '', damage: 0);
+
+    Enemy secondStrikeTarget;
+    if (originalTarget is Enemy) {
+      // Single-target ability: if original target still alive, hit it again
+      // Otherwise, pick a new random target
+      if (originalTarget.isAlive) {
+        secondStrikeTarget = originalTarget;
+      } else {
+        secondStrikeTarget = aliveEnemies[_random.nextInt(aliveEnemies.length)];
+      }
+    } else {
+      // AOE ability: hit a random enemy
+      secondStrikeTarget = aliveEnemies[_random.nextInt(aliveEnemies.length)];
+    }
+
+    final useMagic = magicDamageClasses.contains(attacker.characterClass);
+    final offensiveStat = useMagic ? attacker.totalMagic : attacker.totalAttack;
+    final (dmg, isCrit) = calculateDamage(
+      offensiveStat,
+      ability.damage,
+      secondStrikeTarget.effectiveDefense,
+      targetVulnerable: secondStrikeTarget.isVulnerable,
+      attackerSpeed: attacker.totalSpeed,
+    );
+    secondStrikeTarget.currentHp = max(0, secondStrikeTarget.currentHp - dmg);
+
+    var result = 'Dual Strike: ${secondStrikeTarget.name} takes $dmg damage!';
+    if (isCrit) result += ' CRIT!';
+    if (!secondStrikeTarget.isAlive)
+      result += ' ${secondStrikeTarget.name} is defeated!';
+
+    return (log: result, targetId: secondStrikeTarget.id, damage: dmg);
+  }
+
   /// Dark Pact: sacrifice 15-25% HP, deal 1.5x that to all enemies
   static String executeDarkPact(Character attacker, List<Enemy> aliveEnemies) {
     final sacrificePercent = 0.15 + _random.nextDouble() * 0.10;
@@ -183,7 +262,9 @@ class CombatService {
     // Scales with HP sacrificed + magic stat, 2.5x multiplier
     final damagePerEnemy = ((hpCost + attacker.totalMagic) * 2.5).round();
 
-    final logs = <String>['${attacker.name} sacrifices $hpCost HP with Dark Pact!'];
+    final logs = <String>[
+      '${attacker.name} sacrifices $hpCost HP with Dark Pact!',
+    ];
     for (final enemy in aliveEnemies) {
       enemy.currentHp = max(0, enemy.currentHp - damagePerEnemy);
       logs.add('${enemy.name} takes $damagePerEnemy damage!');
@@ -193,7 +274,7 @@ class CombatService {
   }
 
   /// Returns a log message describing what happened
-  static String executeAllyTurn(
+  static (String, int) executeAllyTurn(
     Character attacker,
     Ability ability,
     dynamic target, { // Character or Enemy
@@ -204,6 +285,7 @@ class CombatService {
     }
 
     final logs = <String>[];
+    int rawDamageDealt = 0;
 
     if (ability.damage > 0 || target is Enemy) {
       // --- OFFENSIVE: damage + optional debuffs/drain/vulnerability ---
@@ -211,7 +293,8 @@ class CombatService {
 
       // ChainCast: AOE bonus, single-target penalty
       double chainCastMult = 1.0;
-      if (attacker.equipment[EquipmentSlot.weapon]?.specialEffect == SpecialEffect.chainCast) {
+      if (attacker.equipment[EquipmentSlot.weapon]?.specialEffect ==
+          SpecialEffect.chainCast) {
         if (ability.targetType == AbilityTarget.allEnemies) {
           chainCastMult = 1.5;
         } else if (ability.targetType == AbilityTarget.singleEnemy) {
@@ -220,37 +303,66 @@ class CombatService {
       }
 
       final useMagic = magicDamageClasses.contains(attacker.characterClass);
-      final offensiveStat = useMagic ? attacker.totalMagic : attacker.totalAttack;
+      final offensiveStat = useMagic
+          ? attacker.totalMagic
+          : attacker.totalAttack;
 
       // Multi-hit: each hit rolls damage separately
       final hits = ability.hitCount;
       for (int hit = 0; hit < hits; hit++) {
         if (!enemyTarget.isAlive) break;
         final (damage, isCrit) = calculateDamage(
-          offensiveStat, ability.damage, enemyTarget.effectiveDefense,
+          offensiveStat,
+          ability.damage,
+          enemyTarget.effectiveDefense,
           targetVulnerable: enemyTarget.isVulnerable,
           chaotic: ability.chaotic,
           damageMultiplier: chainCastMult,
           attackerSpeed: attacker.totalSpeed,
         );
+        rawDamageDealt += damage;
         enemyTarget.currentHp = max(0, enemyTarget.currentHp - damage);
         if (hits > 1) {
-          logs.add('${attacker.name}\'s ${ability.name} hit ${hit + 1}: $damage damage!${isCrit ? ' CRIT!' : ''}');
+          logs.add(
+            '${attacker.name}\'s ${ability.name} hit ${hit + 1}: $damage damage!${isCrit ? ' CRIT!' : ''}',
+          );
         } else {
-          logs.add('${attacker.name} uses ${ability.name} on ${enemyTarget.name} for $damage damage!${isCrit ? ' CRIT!' : ''}');
+          logs.add(
+            '${attacker.name} uses ${ability.name} on ${enemyTarget.name} for $damage damage!${isCrit ? ' CRIT!' : ''}',
+          );
         }
 
         // Vampiric: heal for 25% of damage dealt (per hit)
-        if (attacker.equipment[EquipmentSlot.weapon]?.specialEffect == SpecialEffect.vampiric && damage > 0) {
+        if (attacker.equipment[EquipmentSlot.weapon]?.specialEffect ==
+                SpecialEffect.vampiric &&
+            damage > 0) {
           final vampHeal = (damage * 0.25).round();
-          attacker.currentHp = min(attacker.totalMaxHp, attacker.currentHp + vampHeal);
+          attacker.currentHp = min(
+            attacker.totalMaxHp,
+            attacker.currentHp + vampHeal,
+          );
           logs.add('Drains $vampHeal HP!');
         }
 
         if (ability.lifeDrain) {
           final healAmount = damage;
-          attacker.currentHp = min(attacker.totalMaxHp, attacker.currentHp + healAmount);
+          attacker.currentHp = min(
+            attacker.totalMaxHp,
+            attacker.currentHp + healAmount,
+          );
           logs.add('Drains $healAmount HP!');
+        }
+
+        // Templar passive: heal for 35% of damage dealt
+        if (attacker.characterClass == CharacterClass.templar && damage > 0) {
+          final templarHeal = (damage * 0.35).round();
+          if (templarHeal > 0) {
+            attacker.currentHp = min(
+              attacker.totalMaxHp,
+              attacker.currentHp + templarHeal,
+            );
+            logs.add('Holy fervor heals ${attacker.name} for $templarHeal!');
+          }
         }
       }
 
@@ -260,23 +372,34 @@ class CombatService {
         logs.add('${enemyTarget.name} is weakened!');
       }
       if (ability.enemyAttackDebuffPercent > 0) {
-        enemyTarget.attackMultiplier *= (1 - ability.enemyAttackDebuffPercent / 100);
-        logs.add('${enemyTarget.name} attack reduced by ${ability.enemyAttackDebuffPercent}%!');
+        enemyTarget.attackMultiplier *=
+            (1 - ability.enemyAttackDebuffPercent / 100);
+        logs.add(
+          '${enemyTarget.name} attack reduced by ${ability.enemyAttackDebuffPercent}%!',
+        );
       }
       if (ability.enemyDefenseDebuffPercent > 0) {
-        enemyTarget.defenseMultiplier *= (1 - ability.enemyDefenseDebuffPercent / 100);
-        logs.add('${enemyTarget.name} defense reduced by ${ability.enemyDefenseDebuffPercent}%!');
+        enemyTarget.defenseMultiplier *=
+            (1 - ability.enemyDefenseDebuffPercent / 100);
+        logs.add(
+          '${enemyTarget.name} defense reduced by ${ability.enemyDefenseDebuffPercent}%!',
+        );
       }
-      if (ability.stunChance > 0 && enemyTarget.isAlive && !enemyTarget.isStunned) {
+      if (ability.stunChance > 0 &&
+          enemyTarget.isAlive &&
+          !enemyTarget.isStunned) {
         if (_random.nextInt(100) < ability.stunChance) {
           enemyTarget.isStunned = true;
           logs.add('${enemyTarget.name} is stunned!');
         }
       }
       if (ability.tempEnemyAttackDebuffPercent > 0) {
-        enemyTarget.tempAttackMultiplier = 1 - ability.tempEnemyAttackDebuffPercent / 100;
+        enemyTarget.tempAttackMultiplier =
+            1 - ability.tempEnemyAttackDebuffPercent / 100;
         enemyTarget.tempAttackDebuffTurns = ability.debuffDuration;
-        logs.add('${enemyTarget.name} attack reduced by ${ability.tempEnemyAttackDebuffPercent}% for ${ability.debuffDuration} turns!');
+        logs.add(
+          '${enemyTarget.name} attack reduced by ${ability.tempEnemyAttackDebuffPercent}% for ${ability.debuffDuration} turns!',
+        );
       }
       if (!enemyTarget.isAlive) {
         logs.add('${enemyTarget.name} is defeated!');
@@ -295,11 +418,23 @@ class CombatService {
 
       // Heal
       if (ability.damage < 0) {
-        final healStat = ability.healScalesWithDefense ? attacker.totalDefense : attacker.totalMagic;
-        final (healAmount, healCrit) = calculateHealing(healStat, ability.damage, healingMultiplier: healingMultiplier, casterSpeed: attacker.totalSpeed);
+        final healStat = ability.healScalesWithDefense
+            ? attacker.totalDefense
+            : attacker.totalMagic;
+        final (healAmount, healCrit) = calculateHealing(
+          healStat,
+          ability.damage,
+          healingMultiplier: healingMultiplier,
+          casterSpeed: attacker.totalSpeed,
+        );
         final hpBefore = charTarget.currentHp;
-        charTarget.currentHp = min(charTarget.totalMaxHp, charTarget.currentHp + healAmount);
-        logs.add('${attacker.name} uses ${ability.name} on ${charTarget.name} for $healAmount healing!${healCrit ? ' CRIT!' : ''}');
+        charTarget.currentHp = min(
+          charTarget.totalMaxHp,
+          charTarget.currentHp + healAmount,
+        );
+        logs.add(
+          '${attacker.name} uses ${ability.name} on ${charTarget.name} for $healAmount healing!${healCrit ? ' CRIT!' : ''}',
+        );
 
         // Cleric overheal → shield (excess becomes shield, max 50% of target maxHp)
         if (attacker.characterClass == CharacterClass.cleric) {
@@ -310,14 +445,26 @@ class CombatService {
             final shieldGain = min(overheal, shieldCap - charTarget.shieldHp);
             if (shieldGain > 0) {
               charTarget.shieldHp += shieldGain;
-              logs.add('${charTarget.name} gains $shieldGain shield from overheal!');
+              logs.add(
+                '${charTarget.name} gains $shieldGain shield from overheal!',
+              );
             }
           }
         }
       } else if (ability.healPercentMaxHp > 0) {
-        final healAmount = (charTarget.totalMaxHp * ability.healPercentMaxHp / 100 * healingMultiplier).round();
-        charTarget.currentHp = min(charTarget.totalMaxHp, charTarget.currentHp + healAmount);
-        logs.add('${attacker.name} uses ${ability.name}! ${charTarget.name} heals $healAmount HP!');
+        final healAmount =
+            (charTarget.totalMaxHp *
+                    ability.healPercentMaxHp /
+                    100 *
+                    healingMultiplier)
+                .round();
+        charTarget.currentHp = min(
+          charTarget.totalMaxHp,
+          charTarget.currentHp + healAmount,
+        );
+        logs.add(
+          '${attacker.name} uses ${ability.name}! ${charTarget.name} heals $healAmount HP!',
+        );
       } else {
         logs.add('${attacker.name} uses ${ability.name}!');
       }
@@ -332,13 +479,15 @@ class CombatService {
         logs.add('${charTarget.name} attack +${ability.attackBuffPercent}%!');
       }
       if (ability.grantCasterDefensePercent > 0) {
-        final bonus = (attacker.totalDefense * ability.grantCasterDefensePercent / 100).round();
+        final bonus =
+            (attacker.totalDefense * ability.grantCasterDefensePercent / 100)
+                .round();
         charTarget.combatDefenseBonus += bonus;
         logs.add('${charTarget.name} defense +$bonus!');
       }
     }
 
-    return logs.join(' ');
+    return (logs.join(' '), rawDamageDealt);
   }
 
   /// Check if any ally has an active golem summon (15% party damage reduction)
@@ -347,14 +496,19 @@ class CombatService {
   }
 
   /// Apply Paladin DR and Golem summon DR to incoming damage
-  static (int, List<String>) _applyDefensivePassives(int damage, Character ally, List<Character> allAllies) {
+  static (int, List<String>) _applyDefensivePassives(
+    int damage,
+    Character ally,
+    List<Character> allAllies,
+  ) {
     final logs = <String>[];
     // Golem summon: party takes 15% less damage
     if (_hasGolemSummon(allAllies)) {
       damage = (damage * 0.85).round();
     }
     // Paladin: 25% DR when below 50% HP
-    if (ally.characterClass == CharacterClass.paladin && ally.currentHp < ally.totalMaxHp / 2) {
+    if (ally.characterClass == CharacterClass.paladin &&
+        ally.currentHp < ally.totalMaxHp / 2) {
       damage = (damage * 0.75).round();
       logs.add('${ally.name}\'s divine resolve reduces damage!');
     }
@@ -363,18 +517,32 @@ class CombatService {
 
   /// Fighter counter-attack: 15% chance when hit
   static List<String> _tryFighterCounter(Character ally, Enemy enemy) {
-    if (ally.characterClass != CharacterClass.fighter || !ally.isAlive) return [];
+    if (ally.characterClass != CharacterClass.fighter || !ally.isAlive)
+      return [];
     if (_random.nextInt(100) >= 15) return [];
-    final basicAbility = ally.abilities.firstWhere((a) => a.isBasicAttack, orElse: () => ally.abilities.first);
-    final (counterDmg, counterCrit) = calculateDamage(ally.totalAttack, basicAbility.damage, enemy.effectiveDefense, attackerSpeed: ally.totalSpeed);
+    final basicAbility = ally.abilities.firstWhere(
+      (a) => a.isBasicAttack,
+      orElse: () => ally.abilities.first,
+    );
+    final (counterDmg, counterCrit) = calculateDamage(
+      ally.totalAttack,
+      basicAbility.damage,
+      enemy.effectiveDefense,
+      attackerSpeed: ally.totalSpeed,
+    );
     enemy.currentHp = max(0, enemy.currentHp - counterDmg);
-    var log = '${ally.name} counter-attacks for $counterDmg damage!${counterCrit ? ' CRIT!' : ''}';
+    var log =
+        '${ally.name} counter-attacks for $counterDmg damage!${counterCrit ? ' CRIT!' : ''}';
     if (!enemy.isAlive) log += ' ${enemy.name} is defeated!';
     return [log];
   }
 
   /// Summoner: process persistent summon effects at start of turn
-  static List<String> processSummonEffects(Character summoner, List<Enemy> enemies, List<Character> allies) {
+  static List<String> processSummonEffects(
+    Character summoner,
+    List<Enemy> enemies,
+    List<Character> allies,
+  ) {
     final logs = <String>[];
     final aliveEnemies = enemies.where((e) => e.isAlive).toList();
     final aliveAllies = allies.where((a) => a.isAlive).toList();
@@ -391,11 +559,18 @@ class CombatService {
           }
         case 'fairy':
           if (aliveAllies.isNotEmpty) {
-            final injured = aliveAllies.reduce((a, b) =>
-              (a.currentHp / a.totalMaxHp) < (b.currentHp / b.totalMaxHp) ? a : b);
+            final injured = aliveAllies.reduce(
+              (a, b) =>
+                  (a.currentHp / a.totalMaxHp) < (b.currentHp / b.totalMaxHp)
+                  ? a
+                  : b,
+            );
             if (injured.currentHp < injured.totalMaxHp) {
               final heal = 5 + summoner.totalMagic ~/ 4;
-              injured.currentHp = min(injured.totalMaxHp, injured.currentHp + heal);
+              injured.currentHp = min(
+                injured.totalMaxHp,
+                injured.currentHp + heal,
+              );
               logs.add('Fairy heals ${injured.name} for $heal HP!');
             }
           }
@@ -424,7 +599,11 @@ class CombatService {
   }
 
   /// Enemy AI: pick a random alive ally to attack with basic attack
-  static String executeEnemyTurn(Enemy enemy, List<Character> allies, {double enemyDamageMultiplier = 1.0}) {
+  static String executeEnemyTurn(
+    Enemy enemy,
+    List<Character> allies, {
+    double enemyDamageMultiplier = 1.0,
+  }) {
     // Check stun
     if (enemy.isStunned) {
       enemy.isStunned = false;
@@ -445,12 +624,19 @@ class CombatService {
     if (aliveAllies.isEmpty) return '${enemy.name} has no targets.';
 
     // Pick a random ability (prefer basic attack, sometimes use specials)
-    final availableAbilities = enemy.abilities.where((a) => a.isAvailable).toList();
-    final ability = availableAbilities[_random.nextInt(availableAbilities.length)];
+    final availableAbilities = enemy.abilities
+        .where((a) => a.isAvailable)
+        .toList();
+    final ability =
+        availableAbilities[_random.nextInt(availableAbilities.length)];
 
     if (ability.damage < 0) {
       // Self heal
-      final (healAmount, _) = calculateHealing(enemy.magic, ability.damage, casterSpeed: enemy.speed);
+      final (healAmount, _) = calculateHealing(
+        enemy.magic,
+        ability.damage,
+        casterSpeed: enemy.speed,
+      );
       enemy.currentHp = min(enemy.maxHp, enemy.currentHp + healAmount);
       if (!ability.isBasicAttack) ability.isAvailable = false;
       logs.add('${enemy.name} uses ${ability.name} and heals for $healAmount!');
@@ -460,12 +646,23 @@ class CombatService {
     if (ability.targetType == AbilityTarget.allEnemies) {
       // Hit all allies
       for (final ally in aliveAllies) {
-        var (damage, isCrit) = calculateDamage(enemy.effectiveAttack, ability.damage, ally.totalDefense, damageMultiplier: enemyDamageMultiplier, attackerSpeed: enemy.speed);
+        var (damage, isCrit) = calculateDamage(
+          enemy.effectiveAttack,
+          ability.damage,
+          ally.totalDefense,
+          damageMultiplier: enemyDamageMultiplier,
+          attackerSpeed: enemy.speed,
+        );
         // Defensive passives (Paladin DR, Golem summon)
-        final (reducedDmg, drLogs) = _applyDefensivePassives(damage, ally, allies);
+        final (reducedDmg, drLogs) = _applyDefensivePassives(
+          damage,
+          ally,
+          allies,
+        );
         damage = reducedDmg;
         logs.addAll(drLogs);
-        var log = '${ally.name} takes $damage damage${isCrit ? ' (CRIT!)' : ''}';
+        var log =
+            '${ally.name} takes $damage damage${isCrit ? ' (CRIT!)' : ''}';
         // Shield absorbs damage first
         if (ally.shieldHp > 0) {
           final shieldAbsorb = min(damage, ally.shieldHp);
@@ -488,21 +685,50 @@ class CombatService {
 
         if (!ally.isAlive) logs.add('${ally.name} falls!');
         // Fighter counter-attack
-        if (ally.isAlive && enemy.isAlive) logs.addAll(_tryFighterCounter(ally, enemy));
+        if (ally.isAlive && enemy.isAlive)
+          logs.addAll(_tryFighterCounter(ally, enemy));
       }
       if (!ability.isBasicAttack) ability.isAvailable = false;
-      return [if (logs.isNotEmpty) ...logs, '${enemy.name} uses ${ability.name}!'].join(' ');
+      return [
+        if (logs.isNotEmpty) ...logs,
+        '${enemy.name} uses ${ability.name}!',
+      ].join(' ');
     }
 
-    // Single target
-    final target = aliveAllies[_random.nextInt(aliveAllies.length)];
-    var (damage, isCrit) = calculateDamage(enemy.effectiveAttack, ability.damage, target.totalDefense, damageMultiplier: enemyDamageMultiplier, attackerSpeed: enemy.speed);
+    // Single target — front line bias (65% front, 35% back)
+    final frontLiners = aliveAllies.where((a) => a.isFrontLine).toList();
+    final backLiners = aliveAllies.where((a) => !a.isFrontLine).toList();
+    final Character target;
+    if (frontLiners.isEmpty) {
+      target = backLiners[_random.nextInt(backLiners.length)];
+    } else if (backLiners.isEmpty) {
+      target = frontLiners[_random.nextInt(frontLiners.length)];
+    } else {
+      final roll = _random.nextInt(100);
+      if (roll < 65) {
+        target = frontLiners[_random.nextInt(frontLiners.length)];
+      } else {
+        target = backLiners[_random.nextInt(backLiners.length)];
+      }
+    }
+    var (damage, isCrit) = calculateDamage(
+      enemy.effectiveAttack,
+      ability.damage,
+      target.totalDefense,
+      damageMultiplier: enemyDamageMultiplier,
+      attackerSpeed: enemy.speed,
+    );
     if (!ability.isBasicAttack) ability.isAvailable = false;
     // Defensive passives (Paladin DR, Golem summon)
-    final (reducedDmg, drLogs) = _applyDefensivePassives(damage, target, allies);
+    final (reducedDmg, drLogs) = _applyDefensivePassives(
+      damage,
+      target,
+      allies,
+    );
     damage = reducedDmg;
     logs.addAll(drLogs);
-    var log = '${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!${isCrit ? ' CRIT!' : ''}';
+    var log =
+        '${enemy.name} uses ${ability.name} on ${target.name} for $damage damage!${isCrit ? ' CRIT!' : ''}';
     // Shield absorbs damage first
     if (target.shieldHp > 0) {
       final shieldAbsorb = min(damage, target.shieldHp);
@@ -525,7 +751,8 @@ class CombatService {
 
     if (!target.isAlive) logs.add('${target.name} falls!');
     // Fighter counter-attack
-    if (target.isAlive && enemy.isAlive) logs.addAll(_tryFighterCounter(target, enemy));
+    if (target.isAlive && enemy.isAlive)
+      logs.addAll(_tryFighterCounter(target, enemy));
     return logs.join(' ');
   }
 }
