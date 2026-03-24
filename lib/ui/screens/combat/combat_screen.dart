@@ -16,6 +16,7 @@ import '../../../models/summon_effect.dart';
 import '../../../data/map_backgrounds.dart';
 import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../providers/player_profile_provider.dart';
 import '../../../providers/help_mode_provider.dart';
 import '../../../services/audio_service.dart';
 import '../../../data/mutator_data.dart';
@@ -179,13 +180,17 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       // Druid passive: Nature's Blessing — heal all alive allies for a small amount
       if (char.characterClass == CharacterClass.druid) {
         final heal = 3 + char.totalMagic ~/ 5;
-        final aliveAllies = _combat!.allies.where((a) => a.isAlive && a.currentHp < a.totalMaxHp).toList();
+        final aliveAllies = _combat!.allies
+            .where((a) => a.isAlive && a.currentHp < a.totalMaxHp)
+            .toList();
         if (aliveAllies.isNotEmpty) {
           for (final ally in aliveAllies) {
             ally.currentHp = min(ally.totalMaxHp, ally.currentHp + heal);
           }
           setState(() {
-            _combat!.combatLog.add('Nature\'s Blessing heals the party for $heal HP each!');
+            _combat!.combatLog.add(
+              'Nature\'s Blessing heals the party for $heal HP each!',
+            );
           });
           _scrollLog();
         }
@@ -197,7 +202,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         final repair = max(1, (char.totalMaxHp * 0.05).round());
         char.currentHp = min(char.totalMaxHp, char.currentHp + repair);
         setState(() {
-          _combat!.combatLog.add('Automatic Repair restores ${char.name} for $repair HP!');
+          _combat!.combatLog.add(
+            'Automatic Repair restores ${char.name} for $repair HP!',
+          );
         });
         _scrollLog();
       }
@@ -214,28 +221,52 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           for (final effect in effects) {
             switch (effect.type) {
               case SummonEffectType.wolfAttack:
-                lines.add(_AttackLineData(
-                  char.id, effect.targetId!, effect.amount, false, true,
-                  spellType: SpellType.summonWolf,
-                ));
+                lines.add(
+                  _AttackLineData(
+                    char.id,
+                    effect.targetId!,
+                    effect.amount,
+                    false,
+                    true,
+                    spellType: SpellType.summonWolf,
+                  ),
+                );
               case SummonEffectType.golemShield:
                 for (final allyId in effect.targetIds) {
-                  lines.add(_AttackLineData(
-                    char.id, allyId, 0, false, true,
-                    spellType: SpellType.summonGolem,
-                  ));
+                  lines.add(
+                    _AttackLineData(
+                      char.id,
+                      allyId,
+                      0,
+                      false,
+                      true,
+                      spellType: SpellType.summonGolem,
+                    ),
+                  );
                 }
               case SummonEffectType.fairyHeal:
-                lines.add(_AttackLineData(
-                  char.id, effect.targetId!, effect.amount, true, true,
-                  spellType: SpellType.summonFairy,
-                ));
+                lines.add(
+                  _AttackLineData(
+                    char.id,
+                    effect.targetId!,
+                    effect.amount,
+                    true,
+                    true,
+                    spellType: SpellType.summonFairy,
+                  ),
+                );
               case SummonEffectType.shadowWeaken:
                 for (final enemyId in effect.targetIds) {
-                  lines.add(_AttackLineData(
-                    char.id, enemyId, effect.amount, false, true,
-                    spellType: SpellType.summonShadow,
-                  ));
+                  lines.add(
+                    _AttackLineData(
+                      char.id,
+                      enemyId,
+                      effect.amount,
+                      false,
+                      true,
+                      spellType: SpellType.summonShadow,
+                    ),
+                  );
                 }
             }
           }
@@ -245,19 +276,22 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             _waitingForInput = false;
           });
           _scrollLog();
-          _animateLines(holdMs: 400, onDone: () {
-            if (mounted) {
-              // Check if summons killed all enemies
-              if (_combat!.allEnemiesDead) {
-                _processNextTurn();
-              } else {
-                setState(() {
-                  _waitingForInput = true;
-                  _selectedAbility = null;
-                });
+          _animateLines(
+            holdMs: 400,
+            onDone: () {
+              if (mounted) {
+                // Check if summons killed all enemies
+                if (_combat!.allEnemiesDead) {
+                  _processNextTurn();
+                } else {
+                  setState(() {
+                    _waitingForInput = true;
+                    _selectedAbility = null;
+                  });
+                }
               }
-            }
-          });
+            },
+          );
           return;
         }
       }
@@ -268,28 +302,39 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           _combat!.enemies,
         );
         if (skelResults.isNotEmpty) {
-          final lines = skelResults.map((r) => _AttackLineData(
-            char.id, r.targetId, r.damage, false, true,
-            spellType: SpellType.skeletonAttack,
-          )).toList();
+          final lines = skelResults
+              .map(
+                (r) => _AttackLineData(
+                  char.id,
+                  r.targetId,
+                  r.damage,
+                  false,
+                  true,
+                  spellType: SpellType.skeletonAttack,
+                ),
+              )
+              .toList();
           setState(() {
             _combat!.combatLog.addAll(skelResults.map((r) => r.log));
             _attackLines = lines;
             _waitingForInput = false;
           });
           _scrollLog();
-          _animateLines(holdMs: 400, onDone: () {
-            if (mounted) {
-              if (_combat!.allEnemiesDead) {
-                _processNextTurn();
-              } else {
-                setState(() {
-                  _waitingForInput = true;
-                  _selectedAbility = null;
-                });
+          _animateLines(
+            holdMs: 400,
+            onDone: () {
+              if (mounted) {
+                if (_combat!.allEnemiesDead) {
+                  _processNextTurn();
+                } else {
+                  setState(() {
+                    _waitingForInput = true;
+                    _selectedAbility = null;
+                  });
+                }
               }
-            }
-          });
+            },
+          );
           return;
         }
       }
@@ -318,7 +363,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       // Barbarian passive: taking damage grants +5% attack and +5% defense
       for (final a in _combat!.allies) {
         final diff = allyHpBefore[a.id]! - a.currentHp;
-        if (diff > 0 && a.isAlive && a.characterClass == CharacterClass.barbarian) {
+        if (diff > 0 &&
+            a.isAlive &&
+            a.characterClass == CharacterClass.barbarian) {
           a.combatAttackMultiplier += 0.05;
           a.combatDefenseMultiplier += 0.05;
         }
@@ -490,7 +537,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           healingMultiplier: _healingMultiplier,
         );
         logs.add(result.$1);
-        rawDamageByEnemy[enemy.id] = (rawDamageByEnemy[enemy.id] ?? 0) + result.$2;
+        rawDamageByEnemy[enemy.id] =
+            (rawDamageByEnemy[enemy.id] ?? 0) + result.$2;
       }
       log = logs.join(' ');
     } else if (ability.targetType == AbilityTarget.allEnemies) {
@@ -503,7 +551,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           healingMultiplier: _healingMultiplier,
         );
         logs.add(result.$1);
-        rawDamageByEnemy[enemy.id] = (rawDamageByEnemy[enemy.id] ?? 0) + result.$2;
+        rawDamageByEnemy[enemy.id] =
+            (rawDamageByEnemy[enemy.id] ?? 0) + result.$2;
       }
       log = logs.join(' ');
     } else if (ability.targetType == AbilityTarget.allAllies) {
@@ -692,35 +741,49 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
 
     // Skeleton attacks immediately when summoned
     if (ability.summonId == 'skeleton') {
-      _animateLines(holdMs: 300, onDone: () {
-        if (!mounted || _combat == null) return;
-        final skelResults = CombatService.processSkeletonAttacks(
-          char,
-          _combat!.enemies,
-        );
-        if (skelResults.isNotEmpty) {
-          final skelLines = skelResults.map((r) => _AttackLineData(
-            char.id, r.targetId, r.damage, false, true,
-            spellType: SpellType.skeletonAttack,
-          )).toList();
-          setState(() {
-            _combat!.combatLog.addAll(skelResults.map((r) => r.log));
-            _attackLines = skelLines;
-          });
-          _scrollLog();
-          _animateLines(holdMs: 300, onDone: () {
-            if (mounted) {
-              if (_combat!.allEnemiesDead) {
-                _processNextTurn();
-              } else {
-                _advanceTurn();
-              }
-            }
-          });
-        } else {
-          _advanceTurn();
-        }
-      });
+      _animateLines(
+        holdMs: 300,
+        onDone: () {
+          if (!mounted || _combat == null) return;
+          final skelResults = CombatService.processSkeletonAttacks(
+            char,
+            _combat!.enemies,
+          );
+          if (skelResults.isNotEmpty) {
+            final skelLines = skelResults
+                .map(
+                  (r) => _AttackLineData(
+                    char.id,
+                    r.targetId,
+                    r.damage,
+                    false,
+                    true,
+                    spellType: SpellType.skeletonAttack,
+                  ),
+                )
+                .toList();
+            setState(() {
+              _combat!.combatLog.addAll(skelResults.map((r) => r.log));
+              _attackLines = skelLines;
+            });
+            _scrollLog();
+            _animateLines(
+              holdMs: 300,
+              onDone: () {
+                if (mounted) {
+                  if (_combat!.allEnemiesDead) {
+                    _processNextTurn();
+                  } else {
+                    _advanceTurn();
+                  }
+                }
+              },
+            );
+          } else {
+            _advanceTurn();
+          }
+        },
+      );
     } else {
       _animateLines(holdMs: 300, onDone: _advanceTurn);
     }
@@ -894,7 +957,10 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       final ally = _combat!.allies[allyIdx];
       final frontLineOffset = ally.isFrontLine ? 24.0 : 0.0;
       return Offset(
-        size.width * 0.25 + sprite / 2 + 4 + frontLineOffset, // right edge of ally sprite
+        size.width * 0.25 +
+            sprite / 2 +
+            4 +
+            frontLineOffset, // right edge of ally sprite
         size.height * (allyIdx + 1) / (n + 1),
       );
     }
@@ -1124,11 +1190,14 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                             child: Padding(
                               padding: EdgeInsets.only(left: frontLineOffset),
                               child: GestureDetector(
-                                onTap: isHealTarget || ref.read(helpModeProvider)
+                                onTap:
+                                    isHealTarget || ref.read(helpModeProvider)
                                     ? () {
                                         if (ref.read(helpModeProvider)) {
                                           ref
-                                                  .read(helpModeProvider.notifier)
+                                                  .read(
+                                                    helpModeProvider.notifier,
+                                                  )
                                                   .state =
                                               false;
                                           showCharacterHelp(context, ally);
@@ -1253,7 +1322,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     bool isHealTarget,
   ) {
     final spriteSize = _spriteSize(_combat!.allies.length);
-    final spritePath = classSpritePath(ally.characterClass);
+    final storyProgress = ref.read(playerProfileProvider)?.classStoryProgress[ally.characterClass.name] ?? 0;
+    final spritePath = classSpritePath(ally.characterClass, storyProgress);
 
     return FittedBox(
       fit: BoxFit.scaleDown,
@@ -1302,8 +1372,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                     ),
                   ),
                   if (ally.activeSummons.isNotEmpty)
-                    ...ally.activeSummons.map((id) =>
-                      Padding(
+                    ...ally.activeSummons.map(
+                      (id) => Padding(
                         padding: const EdgeInsets.only(left: 2),
                         child: CustomPaint(
                           size: Size(spriteSize, spriteSize),
@@ -1500,7 +1570,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
           Row(
             children: [
               Image.asset(
-                classSpritePath(char.characterClass),
+                classSpritePath(char.characterClass, ref.read(playerProfileProvider)?.classStoryProgress[char.characterClass.name] ?? 0),
                 width: 24,
                 height: 24,
                 filterQuality: FilterQuality.none,
@@ -1911,8 +1981,15 @@ class _AttackLinePainter extends CustomPainter {
       );
     }
     if (progress > 0.5) {
-      _drawDamageLabel(canvas, from, to, line.amount, line.isHealing, color,
-          overkill: line.overkill);
+      _drawDamageLabel(
+        canvas,
+        from,
+        to,
+        line.amount,
+        line.isHealing,
+        color,
+        overkill: line.overkill,
+      );
     }
   }
 
@@ -1981,13 +2058,9 @@ class _AttackLinePainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(
-        canvas,
-        Offset(to.dx - tp.width / 2, to.dy - 35 - floatY),
-      );
+      tp.paint(canvas, Offset(to.dx - tp.width / 2, to.dy - 35 - floatY));
     }
   }
-
 
   void _drawDamageLabel(
     Canvas canvas,
@@ -2000,7 +2073,9 @@ class _AttackLinePainter extends CustomPainter {
   }) {
     final mid = Offset((from.dx + to.dx) / 2, (from.dy + to.dy) / 2);
     final label = isHealing ? '+$amount' : '-$amount';
-    final overkillText = (!isHealing && overkill > 0) ? ' ($overkill overkill)' : '';
+    final overkillText = (!isHealing && overkill > 0)
+        ? ' ($overkill overkill)'
+        : '';
     final labelOpacity = ((progress - 0.5) * 2).clamp(0.0, 1.0);
     final tp = TextPainter(
       text: TextSpan(
@@ -2041,11 +2116,16 @@ class _AttackLinePainter extends CustomPainter {
     tp.paint(canvas, Offset(mid.dx - tp.width / 2, mid.dy - tp.height / 2));
   }
 
-  void _paintBurningHands(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+  void _paintBurningHands(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
     final amount = line.amount;
-    final fireOrange = const Color(0xFFFF6600);
-    final fireYellow = const Color(0xFFFFD700);
-    final fireRed = const Color(0xFFCC2200);
+    final purpleFlame = const Color(0xFF9C27B0);
+    final lightPurple = const Color(0xFFBA68C8);
+    final darkPurple = const Color(0xFF6A1B9A);
 
     final dx = to.dx - from.dx;
     final dy = to.dy - from.dy;
@@ -2063,10 +2143,10 @@ class _AttackLinePainter extends CustomPainter {
 
     for (int i = 0; i < streamCount; i++) {
       final spread = (i / (streamCount - 1)) * 2.0 - 1.0;
-      final endX = from.dx + dirX * currentDist +
-          perpX * spread * coneHalfWidth * reach;
-      final endY = from.dy + dirY * currentDist +
-          perpY * spread * coneHalfWidth * reach;
+      final endX =
+          from.dx + dirX * currentDist + perpX * spread * coneHalfWidth * reach;
+      final endY =
+          from.dy + dirY * currentDist + perpY * spread * coneHalfWidth * reach;
 
       // Wavy fire stream
       final path = Path()..moveTo(from.dx, from.dy);
@@ -2079,7 +2159,7 @@ class _AttackLinePainter extends CustomPainter {
         path.lineTo(baseX + perpX * wave, baseY + perpY * wave);
       }
 
-      final colors = [fireRed, fireOrange, fireYellow];
+      final colors = [darkPurple, purpleFlame, lightPurple];
       final color = colors[i % 3];
       final width = 2.0 + (1.0 - spread.abs()) * 2.5;
       canvas.drawPath(
@@ -2099,7 +2179,7 @@ class _AttackLinePainter extends CustomPainter {
           canvas.drawCircle(
             Offset(px, py),
             2.5 + (1.0 - spread.abs()) * 2.5,
-            Paint()..color = fireYellow.withValues(alpha: 0.7),
+            Paint()..color = lightPurple.withValues(alpha: 0.7),
           );
         }
       }
@@ -2107,25 +2187,44 @@ class _AttackLinePainter extends CustomPainter {
 
     // Glow at wizard's hands
     canvas.drawCircle(
-      from, 10,
-      Paint()..color = fireOrange.withValues(alpha: 0.3 * reach),
+      from,
+      10,
+      Paint()..color = purpleFlame.withValues(alpha: 0.3 * reach),
     );
     canvas.drawCircle(
-      from, 6,
-      Paint()..color = fireYellow.withValues(alpha: 0.5 * reach),
+      from,
+      6,
+      Paint()..color = lightPurple.withValues(alpha: 0.5 * reach),
+    );
+    canvas.drawCircle(
+      from,
+      6,
+      Paint()..color = lightPurple.withValues(alpha: 0.5 * reach),
     );
 
     if (progress > 0.5) {
-      _drawDamageLabel(canvas, from, to, amount, false, fireOrange,
-          overkill: line.overkill);
+      _drawDamageLabel(
+        canvas,
+        from,
+        to,
+        amount,
+        false,
+        purpleFlame,
+        overkill: line.overkill,
+      );
     }
   }
 
-  void _paintFireball(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+  void _paintFireball(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
     final amount = line.amount;
-    final darkRed = const Color(0xFF8B0000);
-    final red = const Color(0xFFD60000);
-    final yellow = const Color(0xFFFFD700);
+    final darkPurple = const Color(0xFF4A148C);
+    final purple = const Color(0xFF7B1FA2);
+    final lightPurple = const Color(0xFFAB47BC);
     final progressPct = progress.clamp(0.0, 1.0);
     final currentTo = Offset(
       from.dx + (to.dx - from.dx) * progressPct,
@@ -2133,25 +2232,31 @@ class _AttackLinePainter extends CustomPainter {
     );
     final ballRadius = 6.0 + (progressPct * 12.0);
     // Outer dark ring
-    canvas.drawCircle(currentTo, ballRadius, Paint()..color = darkRed);
-    // Mid red ball
-    canvas.drawCircle(currentTo, ballRadius * 0.7, Paint()..color = red);
-    // Inner yellow core
-    canvas.drawCircle(currentTo, ballRadius * 0.4, Paint()..color = yellow);
+    canvas.drawCircle(currentTo, ballRadius, Paint()..color = darkPurple);
+    // Mid purple ball
+    canvas.drawCircle(currentTo, ballRadius * 0.7, Paint()..color = purple);
+    // Inner light purple core
+    canvas.drawCircle(
+      currentTo,
+      ballRadius * 0.4,
+      Paint()..color = lightPurple,
+    );
     // Explosion at impact
     if (progress >= 0.92) {
       final expRadius = ballRadius * 2.2;
       canvas.drawCircle(
         currentTo,
         expRadius,
-        Paint()..color = darkRed.withValues(alpha: 0.3),
+        Paint()..color = darkPurple.withValues(alpha: 0.3),
       );
       canvas.drawCircle(
         currentTo,
         expRadius * 0.7,
-        Paint()..color = red.withValues(alpha: 0.5),
+        Paint()..color = purple.withValues(alpha: 0.5),
       );
-      final overkillText = line.overkill > 0 ? ' (${line.overkill} overkill)' : '';
+      final overkillText = line.overkill > 0
+          ? ' (${line.overkill} overkill)'
+          : '';
       final tp = TextPainter(
         text: TextSpan(
           children: [
@@ -2161,17 +2266,17 @@ class _AttackLinePainter extends CustomPainter {
                 color: Colors.white,
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                shadows: [Shadow(color: darkRed, blurRadius: 6)],
+                shadows: [Shadow(color: darkPurple, blurRadius: 6)],
               ),
             ),
             if (overkillText.isNotEmpty)
               TextSpan(
                 text: overkillText,
                 style: TextStyle(
-                  color: const Color(0xFFFFD700),
+                  color: const Color(0xFFE1BEE7),
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  shadows: [Shadow(color: darkRed, blurRadius: 6)],
+                  shadows: [Shadow(color: darkPurple, blurRadius: 6)],
                 ),
               ),
           ],
@@ -2187,7 +2292,7 @@ class _AttackLinePainter extends CustomPainter {
           ),
           const Radius.circular(4),
         ),
-        Paint()..color = darkRed.withValues(alpha: 0.7),
+        Paint()..color = darkPurple.withValues(alpha: 0.7),
       );
       tp.paint(
         canvas,
@@ -2196,7 +2301,12 @@ class _AttackLinePainter extends CustomPainter {
     }
   }
 
-  void _paintIceStorm(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+  void _paintIceStorm(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
     final amount = line.amount;
     final iceBlue = const Color(0xFF00BFFF);
     final iceCyan = const Color(0xFF00FFFF);
@@ -2209,7 +2319,10 @@ class _AttackLinePainter extends CustomPainter {
     for (int i = 0; i < chunkCount; i++) {
       // Stagger each chunk's start time
       final delay = i * 0.07;
-      final chunkProgress = ((progress - delay) / (1.0 - delay)).clamp(0.0, 1.0);
+      final chunkProgress = ((progress - delay) / (1.0 - delay)).clamp(
+        0.0,
+        1.0,
+      );
       if (chunkProgress <= 0) continue;
 
       // Scatter horizontally around the target
@@ -2231,7 +2344,10 @@ class _AttackLinePainter extends CustomPainter {
         ..close();
 
       final colors = [iceBlue, iceCyan, iceWhite];
-      canvas.drawPath(path, Paint()..color = colors[i % 3].withValues(alpha: 0.85));
+      canvas.drawPath(
+        path,
+        Paint()..color = colors[i % 3].withValues(alpha: 0.85),
+      );
       canvas.drawPath(
         path,
         Paint()
@@ -2266,12 +2382,24 @@ class _AttackLinePainter extends CustomPainter {
     }
 
     if (progress > 0.6) {
-      _drawDamageLabel(canvas, from, to, amount, false, iceBlue,
-          overkill: line.overkill);
+      _drawDamageLabel(
+        canvas,
+        from,
+        to,
+        amount,
+        false,
+        iceBlue,
+        overkill: line.overkill,
+      );
     }
   }
 
-  void _paintChainLightning(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+  void _paintChainLightning(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
     final amount = line.amount;
     final yellow = const Color(0xFFFFEB3B);
     final black = Colors.black;
@@ -2312,12 +2440,24 @@ class _AttackLinePainter extends CustomPainter {
       );
     }
     if (progress > 0.5) {
-      _drawDamageLabel(canvas, from, to, amount, false, yellow,
-          overkill: line.overkill);
+      _drawDamageLabel(
+        canvas,
+        from,
+        to,
+        amount,
+        false,
+        yellow,
+        overkill: line.overkill,
+      );
     }
   }
 
-  void _paintMeteor(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+  void _paintMeteor(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
     final amount = line.amount;
     final darkRed = const Color(0xFF8B0000);
     final orangeRed = const Color(0xFFFF4500);
@@ -2351,7 +2491,9 @@ class _AttackLinePainter extends CustomPainter {
         expRadius * 0.4,
         Paint()..color = gold.withValues(alpha: 0.6),
       );
-      final overkillText = line.overkill > 0 ? ' (${line.overkill} overkill)' : '';
+      final overkillText = line.overkill > 0
+          ? ' (${line.overkill} overkill)'
+          : '';
       final tp = TextPainter(
         text: TextSpan(
           children: [
@@ -2397,7 +2539,12 @@ class _AttackLinePainter extends CustomPainter {
   }
 
   // -- Summon Wolf: gray wolf shape lunges from summoner to target ----------
-  void _paintSummonWolf(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+  void _paintSummonWolf(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
     final gray = const Color(0xFF9E9E9E);
     final darkGray = const Color(0xFF616161);
     final p = progress.clamp(0.0, 1.0);
@@ -2436,11 +2583,13 @@ class _AttackLinePainter extends CustomPainter {
     // Ears
     canvas.drawCircle(
       Offset(currentPos.dx + ny * 4 + nx * 4, currentPos.dy - nx * 4 + ny * 4),
-      3, Paint()..color = gray,
+      3,
+      Paint()..color = gray,
     );
     canvas.drawCircle(
       Offset(currentPos.dx - ny * 4 + nx * 4, currentPos.dy + nx * 4 + ny * 4),
-      3, Paint()..color = gray,
+      3,
+      Paint()..color = gray,
     );
 
     // Trail particles
@@ -2449,7 +2598,8 @@ class _AttackLinePainter extends CustomPainter {
       final tx = from.dx + (to.dx - from.dx) * trailT;
       final ty = from.dy + (to.dy - from.dy) * trailT;
       canvas.drawCircle(
-        Offset(tx, ty), 2.0 - i * 0.4,
+        Offset(tx, ty),
+        2.0 - i * 0.4,
         Paint()..color = gray.withValues(alpha: 0.4 - i * 0.08),
       );
     }
@@ -2472,13 +2622,25 @@ class _AttackLinePainter extends CustomPainter {
     }
 
     if (p > 0.5) {
-      _drawDamageLabel(canvas, from, to, line.amount, false, gray,
-          overkill: line.overkill);
+      _drawDamageLabel(
+        canvas,
+        from,
+        to,
+        line.amount,
+        false,
+        gray,
+        overkill: line.overkill,
+      );
     }
   }
 
   // -- Summon Golem: shield glow from summoner to allies --------------------
-  void _paintSummonGolem(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+  void _paintSummonGolem(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
     final brown = const Color(0xFF8D6E63);
     final gold = const Color(0xFFFFD700);
     final p = progress.clamp(0.0, 1.0);
@@ -2501,13 +2663,24 @@ class _AttackLinePainter extends CustomPainter {
       from.dx + (to.dx - from.dx) * p,
       from.dy + (to.dy - from.dy) * p,
     );
-    canvas.drawCircle(glowPos, 5, Paint()..color = gold.withValues(alpha: 0.5 * (1.0 - p)));
-    canvas.drawCircle(glowPos, 3, Paint()..color = brown.withValues(alpha: 0.7 * (1.0 - p)));
+    canvas.drawCircle(
+      glowPos,
+      5,
+      Paint()..color = gold.withValues(alpha: 0.5 * (1.0 - p)),
+    );
+    canvas.drawCircle(
+      glowPos,
+      3,
+      Paint()..color = brown.withValues(alpha: 0.7 * (1.0 - p)),
+    );
 
     // Shield icon at ally when glow arrives
     if (p > 0.6) {
       final shieldP = ((p - 0.6) / 0.4).clamp(0.0, 1.0);
-      final shieldAlpha = (0.7 * (1.0 - (shieldP - 0.5).abs() * 2)).clamp(0.0, 1.0);
+      final shieldAlpha = (0.7 * (1.0 - (shieldP - 0.5).abs() * 2)).clamp(
+        0.0,
+        1.0,
+      );
       // Shield shape (pointed bottom)
       final shieldPath = Path()
         ..moveTo(to.dx - 10, to.dy - 10)
@@ -2531,7 +2704,12 @@ class _AttackLinePainter extends CustomPainter {
   }
 
   // -- Summon Fairy: sparkle dust raining on healed ally --------------------
-  void _paintSummonFairy(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+  void _paintSummonFairy(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
     final pink = const Color(0xFFFF80AB);
     final green = const Color(0xFF69F0AE);
     final gold = const Color(0xFFFFD700);
@@ -2539,8 +2717,16 @@ class _AttackLinePainter extends CustomPainter {
 
     // Green/pink glow on the target
     final glowAlpha = (1.0 - p * 0.6).clamp(0.0, 1.0);
-    canvas.drawCircle(to, 10 + p * 25, Paint()..color = green.withValues(alpha: 0.2 * glowAlpha));
-    canvas.drawCircle(to, 6 + p * 16, Paint()..color = pink.withValues(alpha: 0.2 * glowAlpha));
+    canvas.drawCircle(
+      to,
+      10 + p * 25,
+      Paint()..color = green.withValues(alpha: 0.2 * glowAlpha),
+    );
+    canvas.drawCircle(
+      to,
+      6 + p * 16,
+      Paint()..color = pink.withValues(alpha: 0.2 * glowAlpha),
+    );
 
     // Fairy dust sparkles around target
     if (p > 0.1) {
@@ -2582,7 +2768,12 @@ class _AttackLinePainter extends CustomPainter {
   }
 
   // -- Summon Shadow: dark clouds drifting to enemies -----------------------
-  void _paintSummonShadow(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+  void _paintSummonShadow(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
     final darkPurple = const Color(0xFF4A148C);
     final black = const Color(0xFF1A1A2E);
     final p = progress.clamp(0.0, 1.0);
@@ -2603,15 +2794,21 @@ class _AttackLinePainter extends CustomPainter {
         Paint()..color = black.withValues(alpha: 0.6),
       );
     }
-    canvas.drawCircle(cloudPos, 4, Paint()..color = darkPurple.withValues(alpha: 0.5));
+    canvas.drawCircle(
+      cloudPos,
+      4,
+      Paint()..color = darkPurple.withValues(alpha: 0.5),
+    );
 
     // Smoke trail
     for (int i = 0; i < 3; i++) {
       final trailT = (p - i * 0.08).clamp(0.0, 1.0);
       final tx = from.dx + (to.dx - from.dx) * trailT;
-      final ty = from.dy + (to.dy - from.dy) * trailT + sin(trailT * pi * 4) * 8;
+      final ty =
+          from.dy + (to.dy - from.dy) * trailT + sin(trailT * pi * 4) * 8;
       canvas.drawCircle(
-        Offset(tx, ty), 3.0 - i * 0.5,
+        Offset(tx, ty),
+        3.0 - i * 0.5,
         Paint()..color = darkPurple.withValues(alpha: 0.2 - i * 0.05),
       );
     }
@@ -2631,13 +2828,25 @@ class _AttackLinePainter extends CustomPainter {
     }
 
     if (p > 0.5 && line.amount > 0) {
-      _drawDamageLabel(canvas, from, to, line.amount, false, darkPurple,
-          overkill: line.overkill);
+      _drawDamageLabel(
+        canvas,
+        from,
+        to,
+        line.amount,
+        false,
+        darkPurple,
+        overkill: line.overkill,
+      );
     }
   }
 
   // -- Skeleton attack: bone projectile from necromancer to enemy -----------
-  void _paintSkeletonAttack(Canvas canvas, Offset from, Offset to, _AttackLineData line) {
+  void _paintSkeletonAttack(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    _AttackLineData line,
+  ) {
     final bone = const Color(0xFFE0E0E0);
     final dark = const Color(0xFF9E9E9E);
     final p = progress.clamp(0.0, 1.0);
@@ -2651,18 +2860,36 @@ class _AttackLinePainter extends CustomPainter {
     final angle = p * pi * 6;
     final boneLen = 8.0;
     canvas.drawLine(
-      Offset(currentPos.dx + cos(angle) * boneLen, currentPos.dy + sin(angle) * boneLen),
-      Offset(currentPos.dx - cos(angle) * boneLen, currentPos.dy - sin(angle) * boneLen),
-      Paint()..color = bone..strokeWidth = 3.0..style = PaintingStyle.stroke..strokeCap = StrokeCap.round,
+      Offset(
+        currentPos.dx + cos(angle) * boneLen,
+        currentPos.dy + sin(angle) * boneLen,
+      ),
+      Offset(
+        currentPos.dx - cos(angle) * boneLen,
+        currentPos.dy - sin(angle) * boneLen,
+      ),
+      Paint()
+        ..color = bone
+        ..strokeWidth = 3.0
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round,
     );
     // Knobs on ends
     canvas.drawCircle(
-      Offset(currentPos.dx + cos(angle) * boneLen, currentPos.dy + sin(angle) * boneLen),
-      2.5, Paint()..color = bone,
+      Offset(
+        currentPos.dx + cos(angle) * boneLen,
+        currentPos.dy + sin(angle) * boneLen,
+      ),
+      2.5,
+      Paint()..color = bone,
     );
     canvas.drawCircle(
-      Offset(currentPos.dx - cos(angle) * boneLen, currentPos.dy - sin(angle) * boneLen),
-      2.5, Paint()..color = bone,
+      Offset(
+        currentPos.dx - cos(angle) * boneLen,
+        currentPos.dy - sin(angle) * boneLen,
+      ),
+      2.5,
+      Paint()..color = bone,
     );
 
     // Trail
@@ -2671,7 +2898,8 @@ class _AttackLinePainter extends CustomPainter {
       final tx = from.dx + (to.dx - from.dx) * trailT;
       final ty = from.dy + (to.dy - from.dy) * trailT;
       canvas.drawCircle(
-        Offset(tx, ty), 2.0 - i * 0.5,
+        Offset(tx, ty),
+        2.0 - i * 0.5,
         Paint()..color = dark.withValues(alpha: 0.3 - i * 0.08),
       );
     }
@@ -2679,13 +2907,23 @@ class _AttackLinePainter extends CustomPainter {
     // Impact
     if (p > 0.85) {
       final impAlpha = ((p - 0.85) / 0.15).clamp(0.0, 1.0);
-      canvas.drawCircle(to, 12 * impAlpha,
-        Paint()..color = bone.withValues(alpha: 0.3 * (1.0 - impAlpha)));
+      canvas.drawCircle(
+        to,
+        12 * impAlpha,
+        Paint()..color = bone.withValues(alpha: 0.3 * (1.0 - impAlpha)),
+      );
     }
 
     if (p > 0.5) {
-      _drawDamageLabel(canvas, from, to, line.amount, false, dark,
-          overkill: line.overkill);
+      _drawDamageLabel(
+        canvas,
+        from,
+        to,
+        line.amount,
+        false,
+        dark,
+        overkill: line.overkill,
+      );
     }
   }
 
@@ -2714,17 +2952,29 @@ class _SummonIconPainter extends CustomPainter {
         final eye = Paint()..color = const Color(0xFFFFEB3B);
         // Body
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx, cy + 4 * s), width: 40 * s, height: 24 * s),
+          Rect.fromCenter(
+            center: Offset(cx, cy + 4 * s),
+            width: 40 * s,
+            height: 24 * s,
+          ),
           body,
         );
         // Head
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx + 18 * s, cy - 6 * s), width: 22 * s, height: 18 * s),
+          Rect.fromCenter(
+            center: Offset(cx + 18 * s, cy - 6 * s),
+            width: 22 * s,
+            height: 18 * s,
+          ),
           body,
         );
         // Snout
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx + 28 * s, cy - 4 * s), width: 12 * s, height: 8 * s),
+          Rect.fromCenter(
+            center: Offset(cx + 28 * s, cy - 4 * s),
+            width: 12 * s,
+            height: 8 * s,
+          ),
           dark,
         );
         // Ears
@@ -2742,7 +2992,11 @@ class _SummonIconPainter extends CustomPainter {
         canvas.drawPath(earPath2, dark);
         // Eyes
         canvas.drawCircle(Offset(cx + 22 * s, cy - 10 * s), 3 * s, eye);
-        canvas.drawCircle(Offset(cx + 22 * s, cy - 10 * s), 1.5 * s, Paint()..color = Colors.black);
+        canvas.drawCircle(
+          Offset(cx + 22 * s, cy - 10 * s),
+          1.5 * s,
+          Paint()..color = Colors.black,
+        );
         // Legs
         for (final lx in [-12.0, -4.0, 8.0, 16.0]) {
           canvas.drawRRect(
@@ -2756,12 +3010,20 @@ class _SummonIconPainter extends CustomPainter {
         // Tail
         final tailPath = Path()
           ..moveTo(cx - 20 * s, cy)
-          ..quadraticBezierTo(cx - 32 * s, cy - 14 * s, cx - 26 * s, cy - 22 * s);
-        canvas.drawPath(tailPath, Paint()
-          ..color = const Color(0xFF9E9E9E)
-          ..strokeWidth = 4 * s
-          ..style = PaintingStyle.stroke
-          ..strokeCap = StrokeCap.round);
+          ..quadraticBezierTo(
+            cx - 32 * s,
+            cy - 14 * s,
+            cx - 26 * s,
+            cy - 22 * s,
+          );
+        canvas.drawPath(
+          tailPath,
+          Paint()
+            ..color = const Color(0xFF9E9E9E)
+            ..strokeWidth = 4 * s
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round,
+        );
 
       case 'golem':
         // Brown/gray rock golem — blocky humanoid
@@ -2772,7 +3034,11 @@ class _SummonIconPainter extends CustomPainter {
         // Body (large rectangle)
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromCenter(center: Offset(cx, cy + 2 * s), width: 32 * s, height: 30 * s),
+            Rect.fromCenter(
+              center: Offset(cx, cy + 2 * s),
+              width: 32 * s,
+              height: 30 * s,
+            ),
             Radius.circular(4 * s),
           ),
           rock,
@@ -2780,7 +3046,11 @@ class _SummonIconPainter extends CustomPainter {
         // Head
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromCenter(center: Offset(cx, cy - 18 * s), width: 22 * s, height: 18 * s),
+            Rect.fromCenter(
+              center: Offset(cx, cy - 18 * s),
+              width: 22 * s,
+              height: 18 * s,
+            ),
             Radius.circular(3 * s),
           ),
           darkRock,
@@ -2820,12 +3090,18 @@ class _SummonIconPainter extends CustomPainter {
         );
         // Rock texture lines
         canvas.drawLine(
-          Offset(cx - 10 * s, cy - 4 * s), Offset(cx + 8 * s, cy),
-          highlight..style = PaintingStyle.stroke..strokeWidth = 1.5 * s,
+          Offset(cx - 10 * s, cy - 4 * s),
+          Offset(cx + 8 * s, cy),
+          highlight
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5 * s,
         );
         canvas.drawLine(
-          Offset(cx - 6 * s, cy + 8 * s), Offset(cx + 12 * s, cy + 6 * s),
-          highlight..style = PaintingStyle.stroke..strokeWidth = 1.5 * s,
+          Offset(cx - 6 * s, cy + 8 * s),
+          Offset(cx + 12 * s, cy + 6 * s),
+          highlight
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5 * s,
         );
 
       case 'fairy':
@@ -2834,17 +3110,30 @@ class _SummonIconPainter extends CustomPainter {
         final pink = const Color(0xFFFF80AB);
         final glow = Paint()..color = const Color(0xFFFFF9C4);
         // Outer glow
-        canvas.drawCircle(Offset(cx, cy), 16 * s,
-          Paint()..color = const Color(0xFF69F0AE).withValues(alpha: 0.15));
+        canvas.drawCircle(
+          Offset(cx, cy),
+          16 * s,
+          Paint()..color = const Color(0xFF69F0AE).withValues(alpha: 0.15),
+        );
         // Wings (large, translucent)
         final leftWing = Path()
           ..moveTo(cx, cy)
-          ..quadraticBezierTo(cx - 28 * s, cy - 20 * s, cx - 16 * s, cy - 30 * s)
+          ..quadraticBezierTo(
+            cx - 28 * s,
+            cy - 20 * s,
+            cx - 16 * s,
+            cy - 30 * s,
+          )
           ..quadraticBezierTo(cx - 6 * s, cy - 16 * s, cx, cy)
           ..close();
         final rightWing = Path()
           ..moveTo(cx, cy)
-          ..quadraticBezierTo(cx + 28 * s, cy - 20 * s, cx + 16 * s, cy - 30 * s)
+          ..quadraticBezierTo(
+            cx + 28 * s,
+            cy - 20 * s,
+            cx + 16 * s,
+            cy - 30 * s,
+          )
           ..quadraticBezierTo(cx + 6 * s, cy - 16 * s, cx, cy)
           ..close();
         final leftWingLow = Path()
@@ -2871,7 +3160,11 @@ class _SummonIconPainter extends CustomPainter {
         canvas.drawPath(rightWing, wingStroke);
         // Body
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx, cy), width: 10 * s, height: 16 * s),
+          Rect.fromCenter(
+            center: Offset(cx, cy),
+            width: 10 * s,
+            height: 16 * s,
+          ),
           green,
         );
         // Head
@@ -2879,8 +3172,16 @@ class _SummonIconPainter extends CustomPainter {
         // Face glow
         canvas.drawCircle(Offset(cx, cy - 10 * s), 4 * s, glow);
         // Eyes
-        canvas.drawCircle(Offset(cx - 2.5 * s, cy - 11 * s), 1.5 * s, Paint()..color = Colors.black);
-        canvas.drawCircle(Offset(cx + 2.5 * s, cy - 11 * s), 1.5 * s, Paint()..color = Colors.black);
+        canvas.drawCircle(
+          Offset(cx - 2.5 * s, cy - 11 * s),
+          1.5 * s,
+          Paint()..color = Colors.black,
+        );
+        canvas.drawCircle(
+          Offset(cx + 2.5 * s, cy - 11 * s),
+          1.5 * s,
+          Paint()..color = Colors.black,
+        );
 
       case 'shadow':
         // Dark ghost — wispy, translucent
@@ -2891,7 +3192,12 @@ class _SummonIconPainter extends CustomPainter {
         final ghostPath = Path()
           ..moveTo(cx - 20 * s, cy + 20 * s)
           ..quadraticBezierTo(cx - 24 * s, cy - 10 * s, cx, cy - 28 * s)
-          ..quadraticBezierTo(cx + 24 * s, cy - 10 * s, cx + 20 * s, cy + 20 * s)
+          ..quadraticBezierTo(
+            cx + 24 * s,
+            cy - 10 * s,
+            cx + 20 * s,
+            cy + 20 * s,
+          )
           // Wavy bottom
           ..lineTo(cx + 14 * s, cy + 12 * s)
           ..lineTo(cx + 8 * s, cy + 20 * s)
@@ -2902,36 +3208,59 @@ class _SummonIconPainter extends CustomPainter {
           ..close();
         canvas.drawPath(ghostPath, ghostBody);
         // Darker inner shadow
-        canvas.drawPath(ghostPath, Paint()
-          ..color = Colors.black.withValues(alpha: 0.2));
+        canvas.drawPath(
+          ghostPath,
+          Paint()..color = Colors.black.withValues(alpha: 0.2),
+        );
         // Eyes (hollow, glowing)
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx - 7 * s, cy - 8 * s), width: 10 * s, height: 12 * s),
+          Rect.fromCenter(
+            center: Offset(cx - 7 * s, cy - 8 * s),
+            width: 10 * s,
+            height: 12 * s,
+          ),
           eyeColor,
         );
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx + 7 * s, cy - 8 * s), width: 10 * s, height: 12 * s),
+          Rect.fromCenter(
+            center: Offset(cx + 7 * s, cy - 8 * s),
+            width: 10 * s,
+            height: 12 * s,
+          ),
           eyeColor,
         );
         // Dark pupils
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx - 7 * s, cy - 6 * s), width: 5 * s, height: 7 * s),
+          Rect.fromCenter(
+            center: Offset(cx - 7 * s, cy - 6 * s),
+            width: 5 * s,
+            height: 7 * s,
+          ),
           Paint()..color = Colors.black,
         );
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx + 7 * s, cy - 6 * s), width: 5 * s, height: 7 * s),
+          Rect.fromCenter(
+            center: Offset(cx + 7 * s, cy - 6 * s),
+            width: 5 * s,
+            height: 7 * s,
+          ),
           Paint()..color = Colors.black,
         );
         // Mouth
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx, cy + 6 * s), width: 10 * s, height: 8 * s),
+          Rect.fromCenter(
+            center: Offset(cx, cy + 6 * s),
+            width: 10 * s,
+            height: 8 * s,
+          ),
           Paint()..color = Colors.black.withValues(alpha: 0.6),
         );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _SummonIconPainter old) => old.summonId != summonId;
+  bool shouldRepaint(covariant _SummonIconPainter old) =>
+      old.summonId != summonId;
 }
 
 // ===========================================================================
@@ -2961,7 +3290,11 @@ class _SkeletonPackPainter extends CustomPainter {
       // Rib cage / body
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromCenter(center: Offset(cx + ox, cy + 10 * s + oy), width: 20 * s, height: 24 * s),
+          Rect.fromCenter(
+            center: Offset(cx + ox, cy + 10 * s + oy),
+            width: 20 * s,
+            height: 24 * s,
+          ),
           Radius.circular(4 * s),
         ),
         Paint()..color = darkBone.withValues(alpha: alpha * 0.7),
@@ -2980,16 +3313,28 @@ class _SkeletonPackPainter extends CustomPainter {
 
       // Skull
       canvas.drawOval(
-        Rect.fromCenter(center: Offset(cx + ox, cy - 14 * s + oy), width: 22 * s, height: 20 * s),
+        Rect.fromCenter(
+          center: Offset(cx + ox, cy - 14 * s + oy),
+          width: 22 * s,
+          height: 20 * s,
+        ),
         Paint()..color = bone.withValues(alpha: alpha),
       );
       // Eye sockets
       canvas.drawOval(
-        Rect.fromCenter(center: Offset(cx + ox - 5 * s, cy - 16 * s + oy), width: 7 * s, height: 8 * s),
+        Rect.fromCenter(
+          center: Offset(cx + ox - 5 * s, cy - 16 * s + oy),
+          width: 7 * s,
+          height: 8 * s,
+        ),
         Paint()..color = eyeColor.withValues(alpha: alpha),
       );
       canvas.drawOval(
-        Rect.fromCenter(center: Offset(cx + ox + 5 * s, cy - 16 * s + oy), width: 7 * s, height: 8 * s),
+        Rect.fromCenter(
+          center: Offset(cx + ox + 5 * s, cy - 16 * s + oy),
+          width: 7 * s,
+          height: 8 * s,
+        ),
         Paint()..color = eyeColor.withValues(alpha: alpha),
       );
       // Nose
@@ -3003,8 +3348,13 @@ class _SkeletonPackPainter extends CustomPainter {
       );
       // Jaw
       canvas.drawArc(
-        Rect.fromCenter(center: Offset(cx + ox, cy - 6 * s + oy), width: 14 * s, height: 8 * s),
-        0, pi,
+        Rect.fromCenter(
+          center: Offset(cx + ox, cy - 6 * s + oy),
+          width: 14 * s,
+          height: 8 * s,
+        ),
+        0,
+        pi,
         false,
         Paint()
           ..color = darkBone.withValues(alpha: alpha)
@@ -3016,35 +3366,55 @@ class _SkeletonPackPainter extends CustomPainter {
       canvas.drawLine(
         Offset(cx + ox - 10 * s, cy + 4 * s + oy),
         Offset(cx + ox - 18 * s, cy + 18 * s + oy),
-        Paint()..color = bone.withValues(alpha: alpha)..strokeWidth = 2.5 * s..strokeCap = StrokeCap.round,
+        Paint()
+          ..color = bone.withValues(alpha: alpha)
+          ..strokeWidth = 2.5 * s
+          ..strokeCap = StrokeCap.round,
       );
       canvas.drawLine(
         Offset(cx + ox + 10 * s, cy + 4 * s + oy),
         Offset(cx + ox + 18 * s, cy + 18 * s + oy),
-        Paint()..color = bone.withValues(alpha: alpha)..strokeWidth = 2.5 * s..strokeCap = StrokeCap.round,
+        Paint()
+          ..color = bone.withValues(alpha: alpha)
+          ..strokeWidth = 2.5 * s
+          ..strokeCap = StrokeCap.round,
       );
 
       // Legs
       canvas.drawLine(
         Offset(cx + ox - 4 * s, cy + 22 * s + oy),
         Offset(cx + ox - 6 * s, cy + 34 * s + oy),
-        Paint()..color = bone.withValues(alpha: alpha)..strokeWidth = 2.5 * s..strokeCap = StrokeCap.round,
+        Paint()
+          ..color = bone.withValues(alpha: alpha)
+          ..strokeWidth = 2.5 * s
+          ..strokeCap = StrokeCap.round,
       );
       canvas.drawLine(
         Offset(cx + ox + 4 * s, cy + 22 * s + oy),
         Offset(cx + ox + 6 * s, cy + 34 * s + oy),
-        Paint()..color = bone.withValues(alpha: alpha)..strokeWidth = 2.5 * s..strokeCap = StrokeCap.round,
+        Paint()
+          ..color = bone.withValues(alpha: alpha)
+          ..strokeWidth = 2.5 * s
+          ..strokeCap = StrokeCap.round,
       );
     }
 
     // Count badge
     if (count > 0) {
       final badgeCenter = Offset(cx + 16 * s, cy - 26 * s);
-      canvas.drawCircle(badgeCenter, 10 * s, Paint()..color = Colors.black.withValues(alpha: 0.7));
-      canvas.drawCircle(badgeCenter, 10 * s, Paint()
-        ..color = const Color(0xFF4CAF50)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5 * s);
+      canvas.drawCircle(
+        badgeCenter,
+        10 * s,
+        Paint()..color = Colors.black.withValues(alpha: 0.7),
+      );
+      canvas.drawCircle(
+        badgeCenter,
+        10 * s,
+        Paint()
+          ..color = const Color(0xFF4CAF50)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5 * s,
+      );
       final tp = TextPainter(
         text: TextSpan(
           text: '$count',
@@ -3056,7 +3426,10 @@ class _SkeletonPackPainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(canvas, Offset(badgeCenter.dx - tp.width / 2, badgeCenter.dy - tp.height / 2));
+      tp.paint(
+        canvas,
+        Offset(badgeCenter.dx - tp.width / 2, badgeCenter.dy - tp.height / 2),
+      );
     }
   }
 

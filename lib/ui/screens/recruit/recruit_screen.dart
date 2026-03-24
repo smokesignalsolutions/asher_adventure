@@ -8,6 +8,7 @@ import '../../../data/sprite_data.dart';
 import '../../../models/character.dart';
 import '../../../models/enums.dart';
 import '../../../providers/game_state_provider.dart';
+import '../../../providers/player_profile_provider.dart';
 import '../../../providers/help_mode_provider.dart';
 import '../../widgets/audio_controls.dart';
 import '../../widgets/help_button.dart';
@@ -165,7 +166,7 @@ class _RecruitScreenState extends ConsumerState<RecruitScreen> {
                             children: [
                               // Class sprite
                               Image.asset(
-                                classSpritePath(cls),
+                                classSpritePath(cls, ref.read(playerProfileProvider)?.classStoryProgress[cls.name] ?? 0),
                                 width: 48,
                                 height: 48,
                                 filterQuality: FilterQuality.none,
