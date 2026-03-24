@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/class_data.dart';
+import '../../../data/class_stories.dart';
 import '../../../data/sprite_data.dart';
 import '../../../models/ability.dart';
 import '../../../models/enums.dart';
+import '../../../models/player_profile.dart';
+import '../../../providers/player_profile_provider.dart';
 
-class HelpScreen extends StatelessWidget {
+class HelpScreen extends ConsumerWidget {
   const HelpScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(playerProfileProvider);
     final theme = Theme.of(context);
     final classes = classDefinitions.values.toList();
 
@@ -31,7 +36,7 @@ class HelpScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            _buildClassesTab(theme, classes),
+            _buildClassesTab(theme, classes, profile),
             _buildNodesTab(theme),
           ],
         ),
@@ -39,8 +44,7 @@ class HelpScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildClassesTab(ThemeData theme, List<ClassDefinition> classes) {
-    // Starter classes first, then the rest
+  Widget _buildClassesTab(ThemeData theme, List<ClassDefinition> classes, PlayerProfile? profile) {
     final sorted = [...classes]..sort((a, b) {
         if (a.unlockedByDefault != b.unlockedByDefault) {
           return a.unlockedByDefault ? -1 : 1;
@@ -53,7 +57,7 @@ class HelpScreen extends StatelessWidget {
       itemCount: sorted.length,
       itemBuilder: (context, index) {
         final cls = sorted[index];
-        return _ClassCard(cls: cls, theme: theme);
+        return _ClassCard(cls: cls, theme: theme, profile: profile);
       },
     );
   }
@@ -72,7 +76,7 @@ class HelpScreen extends StatelessWidget {
 
     return ListView.builder(
       padding: const EdgeInsets.all(8),
-      itemCount: nodes.length + 1, // +1 for the army info card
+      itemCount: nodes.length + 1,
       itemBuilder: (context, index) {
         if (index < nodes.length) {
           final node = nodes[index];
@@ -84,7 +88,6 @@ class HelpScreen extends StatelessWidget {
             ),
           );
         }
-        // Army info card
         return Card(
           color: theme.colorScheme.errorContainer,
           child: ListTile(
@@ -119,18 +122,19 @@ class _NodeInfo {
 class _ClassCard extends StatelessWidget {
   final ClassDefinition cls;
   final ThemeData theme;
+  final PlayerProfile? profile;
 
-  const _ClassCard({required this.cls, required this.theme});
+  const _ClassCard({required this.cls, required this.theme, required this.profile});
 
   @override
   Widget build(BuildContext context) {
-    final stats = cls.baseStats;
+    final progress = profile?.classStoryProgress[cls.characterClass.name] ?? 0;
 
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         leading: Image.asset(
-          classSpritePath(cls.characterClass),
+          classSpritePath(cls.characterClass, progress),
           width: 40,
           height: 40,
           filterQuality: FilterQuality.none,
@@ -160,15 +164,273 @@ class _ClassCard extends StatelessWidget {
               ),
           ],
         ),
-        subtitle: Text(
-          'HP:${stats.hp}  ATK:${stats.attack}  DEF:${stats.defense}  '
-          'SPD:${stats.speed}  MAG:${stats.magic}',
-          style: theme.textTheme.bodySmall,
+        subtitle: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'HP:${cls.baseStats.hp}  ATK:${cls.baseStats.attack}  DEF:${cls.baseStats.defense}  '
+                'SPD:${cls.baseStats.speed}  MAG:${cls.baseStats.magic}',
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          ],
         ),
         children: [
-          for (final ability in cls.abilities)
-            _buildAbilityRow(ability, theme),
-          const SizedBox(height: 8),
+          // Art tiers row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: _buildArtTiers(cls, progress, theme),
+          ),
+          // Two-column body: abilities left, story timeline right
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Left: Abilities
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ABILITIES',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      for (final ability in cls.abilities)
+                        _buildAbilityRow(ability, theme),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Right: Story Timeline
+                Expanded(
+                  child: _buildStoryTimeline(cls, progress, theme),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArtTiers(ClassDefinition cls, int progress, ThemeData theme) {
+    final currentTier = artTierForProgress(progress);
+    final tiers = [
+      ('low', 'Basic', 0),
+      ('mid', '4/8 chapters', 4),
+      ('high', '8/8 chapters', 8),
+    ];
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (int i = 0; i < tiers.length; i++) ...[
+          if (i > 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.arrow_forward, size: 14,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
+            ),
+          _buildArtTierImage(cls, tiers[i], currentTier, progress, theme),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildArtTierImage(
+    ClassDefinition cls,
+    (String tier, String label, int threshold) tierInfo,
+    String currentTier,
+    int progress,
+    ThemeData theme,
+  ) {
+    final (tier, label, threshold) = tierInfo;
+    final isUnlocked = progress >= threshold;
+    final isCurrent = currentTier == tier;
+    final path = 'assets/new_art/${cls.characterClass.name}_${tier}_128x128.png';
+
+    Widget image = Image.asset(
+      path, width: 64, height: 64,
+      filterQuality: FilterQuality.none,
+      errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 64),
+    );
+
+    if (!isUnlocked) {
+      image = ColorFiltered(
+        colorFilter: const ColorFilter.matrix(<double>[
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0,      0,      0,      1, 0,
+        ]),
+        child: Opacity(opacity: 0.4, child: image),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isCurrent
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.2),
+              width: isCurrent ? 2 : 1,
+            ),
+          ),
+          padding: const EdgeInsets.all(4),
+          child: image,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          isCurrent && threshold == 0 ? 'Basic' : label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: isCurrent
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStoryTimeline(ClassDefinition cls, int progress, ThemeData theme) {
+    final stories = classStories
+        .where((s) => s.characterClass == cls.characterClass)
+        .toList()
+      ..sort((a, b) => a.chapter.compareTo(b.chapter));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'BACKSTORY',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '$progress/8',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...List.generate(stories.length, (i) {
+          final chapter = stories[i];
+          final isUnlocked = progress >= chapter.chapter;
+          final isLast = i == stories.length - 1;
+          return _buildTimelineEntry(chapter, isUnlocked, isLast, theme);
+        }),
+      ],
+    );
+  }
+
+  Widget _buildTimelineEntry(ClassStoryChapter chapter, bool isUnlocked, bool isLast, ThemeData theme) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Timeline node + connecting line
+          SizedBox(
+            width: 28,
+            child: Column(
+              children: [
+                Container(
+                  width: 22, height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isUnlocked
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${chapter.chapter}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: isUnlocked
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: isUnlocked
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.15),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Chapter content
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isUnlocked
+                    ? theme.colorScheme.surfaceContainerLow
+                    : theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border(
+                  left: BorderSide(
+                    color: isUnlocked
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.15),
+                    width: 3,
+                  ),
+                ),
+              ),
+              child: isUnlocked
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          chapter.title,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          chapter.content,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      'Chapter ${chapter.chapter}: Not unlocked',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                      ),
+                    ),
+            ),
+          ),
         ],
       ),
     );
@@ -189,7 +451,7 @@ class _ClassCard extends StatelessWidget {
     };
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
