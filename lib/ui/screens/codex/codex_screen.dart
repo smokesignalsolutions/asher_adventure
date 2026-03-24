@@ -17,7 +17,7 @@ class CodexScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return DefaultTabController(
-      length: 3,
+      length: 2,
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
@@ -29,7 +29,6 @@ class CodexScreen extends ConsumerWidget {
             tabs: [
               Tab(text: 'Bestiary'),
               Tab(text: 'Lore'),
-              Tab(text: 'Stories'),
             ],
           ),
         ),
@@ -37,7 +36,6 @@ class CodexScreen extends ConsumerWidget {
           children: [
             _buildBestiaryTab(profile, theme),
             _buildLoreTab(profile, theme),
-            _buildStoriesTab(profile, theme),
           ],
         ),
       ),
@@ -204,68 +202,4 @@ class CodexScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStoriesTab(PlayerProfile profile, ThemeData theme) {
-    // Group stories by class
-    final grouped = <String, List<ClassStoryChapter>>{};
-    for (final story in classStories) {
-      grouped.putIfAbsent(story.characterClass.name, () => []).add(story);
-    }
-
-    final classNames = grouped.keys.toList();
-
-    return ListView(
-      padding: const EdgeInsets.all(8),
-      children: classNames.map((className) {
-        final chapters = grouped[className]!..sort((a, b) => a.chapter.compareTo(b.chapter));
-        final progress = profile.classStoryProgress[className] ?? 0;
-        final displayName = className[0].toUpperCase() + className.substring(1);
-
-        return ExpansionTile(
-          title: Text(displayName),
-          subtitle: Text('$progress/${chapters.length} chapters'),
-          children: chapters.map((ch) {
-            final unlocked = progress >= ch.chapter;
-            if (unlocked) {
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Chapter ${ch.chapter}: ${ch.title}',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(ch.content, style: theme.textTheme.bodyMedium),
-                    ],
-                  ),
-                ),
-              );
-            } else {
-              final hintMap = {1: 'Complete map 2', 2: 'Complete map 5', 3: 'Complete map 8'};
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: ListTile(
-                  leading: Icon(Icons.lock, color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
-                  title: Text(
-                    'Chapter ${ch.chapter}: ???',
-                    style: TextStyle(color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
-                  ),
-                  subtitle: Text(
-                    '${hintMap[ch.chapter] ?? "Complete more maps"} with this class alive',
-                    style: TextStyle(
-                      fontStyle: FontStyle.italic,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                    ),
-                  ),
-                ),
-              );
-            }
-          }).toList(),
-        );
-      }).toList(),
-    );
-  }
 }
