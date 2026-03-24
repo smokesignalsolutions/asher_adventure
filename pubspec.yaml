@@ -56,8 +56,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/sprites/
-    - assets/sprites/enemies/
+    - assets/new_art/
     - assets/sprites/abilities/
     - assets/sprites/backgrounds/
     - assets/audio/music/
