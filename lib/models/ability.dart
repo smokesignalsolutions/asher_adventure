@@ -1,4 +1,5 @@
 import 'enums.dart';
+import 'status_effect.dart';
 
 class Ability {
   final String name;
@@ -32,6 +33,7 @@ class Ability {
   final String summonId; // persistent summon identifier (summoner class)
   final bool isPhysicalAttack; // for spellsword alternating bonus
   final bool rogueDualStrike; // rogue: 15% chance to execute ability twice
+  final List<AppliedEffect> appliesStatusEffects;
   bool isAvailable;
 
   Ability({
@@ -62,10 +64,11 @@ class Ability {
     this.summonId = '',
     this.isPhysicalAttack = false,
     this.rogueDualStrike = false,
+    this.appliesStatusEffects = const [],
     this.isAvailable = true,
   });
 
-  Ability copyWith({bool? isAvailable, int? unlockedAtLevel}) {
+  Ability copyWith({bool? isAvailable, int? unlockedAtLevel, List<AppliedEffect>? appliesStatusEffects}) {
     return Ability(
       name: name,
       description: description,
@@ -94,6 +97,7 @@ class Ability {
       summonId: summonId,
       isPhysicalAttack: isPhysicalAttack,
       rogueDualStrike: rogueDualStrike,
+      appliesStatusEffects: appliesStatusEffects ?? this.appliesStatusEffects,
       isAvailable: isAvailable ?? this.isAvailable,
     );
   }
@@ -127,6 +131,8 @@ class Ability {
     'summonId': summonId,
     'isPhysicalAttack': isPhysicalAttack,
     'rogueDualStrike': rogueDualStrike,
+    if (appliesStatusEffects.isNotEmpty)
+      'appliesStatusEffects': appliesStatusEffects.map((e) => e.toJson()).toList(),
   };
 
   factory Ability.fromJson(Map<String, dynamic> json) => Ability(
@@ -157,6 +163,9 @@ class Ability {
     summonId: json['summonId'] ?? '',
     isPhysicalAttack: json['isPhysicalAttack'] ?? false,
     rogueDualStrike: json['rogueDualStrike'] ?? false,
+    appliesStatusEffects: (json['appliesStatusEffects'] as List?)
+        ?.map((e) => AppliedEffect.fromJson(e))
+        .toList() ?? const [],
     isAvailable: json['isAvailable'] ?? true,
   );
 }
