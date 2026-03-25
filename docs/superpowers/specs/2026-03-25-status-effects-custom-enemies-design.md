@@ -69,8 +69,8 @@ When an ability lists a status effect without an explicit magnitude, use the def
 
 - **DoTs stack independently** — a target can have multiple poison instances ticking at once, each with its own damage and duration
 - **Control effects refresh** — reapplying stunned/frozen/silenced/blinded resets duration to the new application's value (latest wins)
-- **Stat debuffs (weakened, exposed, slowed) take strongest** — if a target already has weakened 25% and gets weakened 50%, use 50% and refresh duration. If the new application is weaker, just refresh the duration
-- **Vulnerable stacks** — multiple vulnerable applications increase the magnitude (capped at 30%)
+- **Stat debuffs (weakened, exposed, slowed) stack as separate instances** — each application is tracked independently. At resolution time, use the strongest active magnitude. This means a permanent weakened 25% and a temporary weakened 50% coexist; while the temporary one is active, 50% applies; when it expires, the permanent 25% is still there. This is an intentional change from the old multiplicative stacking — multi-debuff strategies are slightly weaker but more predictable.
+- **Vulnerable stacks** — multiple vulnerable applications increase the magnitude (capped at 30%). Duration takes the longer/permanent value.
 - **Cursed refreshes** — reapplying cursed resets duration
 
 ### Boss Resistance
@@ -166,15 +166,27 @@ Each effect rolls independently on hit. Example: Gore Charge has `[{stunned, 1, 
 
 **Remove:**
 - `isVulnerable`
-- `attackMultiplier`
-- `defenseMultiplier`
 - `tempAttackMultiplier`
 - `tempAttackDebuffTurns`
 - `isStunned`
 
+**Keep (non-status-effect uses):**
+- `attackMultiplier` — still used by boss enrage mechanic (+10% attack per round after round 15) and Shadow summon passive (-10% attack per turn). These are not debuffs applied by abilities, so they don't belong in the status effect system. Renamed to `enrageMultiplier` for clarity.
+- `defenseMultiplier` — keep for symmetry with attackMultiplier, in case future mechanics need it. Renamed to `baseDefenseMultiplier`.
+
 **Add:**
 - `List<StatusEffect> statusEffects`
 - Same getters and helpers as Character (effective stats, status checks, tick/remove)
+- `effectiveAttack` layers: base attack × enrageMultiplier → then weakened reduction from status effects
+- `effectiveDefense` layers: base defense × baseDefenseMultiplier → then exposed reduction from status effects
+
+### Shadow Summon Migration
+
+The Shadow summon currently mutates `e.attackMultiplier` directly (-10% per turn, floor 50%). After migration, it will mutate `e.enrageMultiplier` instead. This is NOT a status effect — it's a permanent passive reduction applied by the summoner's Shadow companion, and it stacks multiplicatively each turn. It stays as direct field mutation on the renamed field.
+
+### Help Dialog Update
+
+`help_dialogs.dart` currently reads `enemy.attackMultiplier` and `enemy.defenseMultiplier` to display stat modifications. Update to read from the renamed fields (`enrageMultiplier`, `baseDefenseMultiplier`) and also display active status effects from the `statusEffects` list.
 
 ### Existing Player Abilities Migration
 
@@ -213,7 +225,15 @@ Key changes to combat_service.dart:
 
 ### Stat Computation
 
-All damage/defense calculations use the `effective*` getters which factor in active status effects. For Characters, the effective stat computation layers: base stat → combat multiplier (buffs/map modifiers) → status effect reduction (debuffs). For Enemies, the effective stat computation is: base stat → status effect reduction only (enemies don't have buff multipliers).
+All damage/defense calculations use the `effective*` getters which factor in active status effects. For Characters, the effective stat computation layers: base stat → combat multiplier (buffs/map modifiers) → status effect reduction (debuffs). For Enemies, the effective stat computation layers: base stat → enrageMultiplier/baseDefenseMultiplier → status effect reduction (debuffs).
+
+### Enemy AI Targeting
+
+Enemy AI continues to pick random alive targets for special abilities — no smart targeting based on existing status effects. This keeps the AI simple and predictable for the player. If an enemy applies stun to an already-stunned target, it just refreshes the duration per stacking rules.
+
+### Ability.copyWith Update
+
+`Ability.copyWith` must be updated to include the new `appliesStatusEffects` field, since it's used by `_enemyFromTemplate` and other copy patterns.
 
 ---
 
@@ -234,7 +254,9 @@ Custom enemy XP = tier XP × 1.15
 Custom enemy gold = tier gold × 1.15
 ```
 
-Where "tier" is determined by which slot (1-8) the map lands in during a run.
+Where "tier" is determined by which slot (1-8) the map lands in during a run. "Tier base stats" means the average stats of the 3 generic enemies in that tier. Custom enemies are defined as scaling templates (like army soldiers), not as fixed stat blocks — their actual stats are computed at encounter time based on the map's tier slot.
+
+**initCombat integration:** `clearStatusEffects()` must be called during `initCombat` for all combatants to ensure no effects carry over from previous fights.
 
 **Encounter generation** (`lib/services/map_service.dart`):
 When building a combat encounter for a map node, custom map enemies are added to the pool alongside generic tier enemies. Not every fight will have one — they're mixed in randomly.
