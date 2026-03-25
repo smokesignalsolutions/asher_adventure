@@ -443,55 +443,6 @@ class CombatService {
         }
       }
 
-      // Legacy debuff fields (bridge until class_data.dart is migrated)
-      final isBoss = enemyTarget.type == 'boss';
-      if (ability.appliesVulnerability && enemyTarget.vulnerableMagnitude == 0) {
-        enemyTarget.addStatusEffect(StatusEffect(
-          type: StatusEffectType.vulnerable,
-          duration: -1,
-          magnitude: StatusDefaults.vulnerablePercent,
-          sourceId: attacker.id,
-        ));
-        logs.add('${enemyTarget.name} is vulnerable!');
-      }
-      if (ability.enemyAttackDebuffPercent > 0) {
-        enemyTarget.addStatusEffect(StatusEffect(
-          type: StatusEffectType.weakened,
-          duration: -1,
-          magnitude: ability.enemyAttackDebuffPercent,
-          sourceId: attacker.id,
-        ));
-        logs.add('${enemyTarget.name} attack reduced by ${ability.enemyAttackDebuffPercent}%!');
-      }
-      if (ability.enemyDefenseDebuffPercent > 0) {
-        enemyTarget.addStatusEffect(StatusEffect(
-          type: StatusEffectType.exposed,
-          duration: -1,
-          magnitude: ability.enemyDefenseDebuffPercent,
-          sourceId: attacker.id,
-        ));
-        logs.add('${enemyTarget.name} defense reduced by ${ability.enemyDefenseDebuffPercent}%!');
-      }
-      if (ability.stunChance > 0 && enemyTarget.isAlive && !enemyTarget.isStunned) {
-        if (_random.nextInt(100) < ability.stunChance) {
-          enemyTarget.addStatusEffect(StatusEffect(
-            type: StatusEffectType.stunned,
-            duration: 1,
-            sourceId: attacker.id,
-          ));
-          logs.add('${enemyTarget.name} is stunned!');
-        }
-      }
-      if (ability.tempEnemyAttackDebuffPercent > 0) {
-        final dur = isBoss ? max(1, ability.debuffDuration - 1) : ability.debuffDuration;
-        enemyTarget.addStatusEffect(StatusEffect(
-          type: StatusEffectType.weakened,
-          duration: dur,
-          magnitude: ability.tempEnemyAttackDebuffPercent,
-          sourceId: attacker.id,
-        ));
-        logs.add('${enemyTarget.name} attack reduced by ${ability.tempEnemyAttackDebuffPercent}% for $dur turns!');
-      }
       if (!enemyTarget.isAlive) {
         logs.add('${enemyTarget.name} is defeated!');
       }

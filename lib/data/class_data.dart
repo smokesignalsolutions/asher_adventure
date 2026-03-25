@@ -1,6 +1,7 @@
 import '../models/ability.dart';
 import '../models/character.dart';
 import '../models/enums.dart';
+import '../models/status_effect.dart';
 
 class ClassDefinition {
   final String name;
@@ -150,7 +151,9 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 55,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 5,
-        appliesVulnerability: true,
+        appliesStatusEffects: [
+          AppliedEffect(type: StatusEffectType.vulnerable, duration: -1, magnitude: 15),
+        ],
         rogueDualStrike: true,
       ),
       Ability(
@@ -482,8 +485,10 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 55,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 2,
-        enemyAttackDebuffPercent: 20,
-        enemyDefenseDebuffPercent: 20,
+        appliesStatusEffects: [
+          AppliedEffect(type: StatusEffectType.weakened, duration: -1, magnitude: 20),
+          AppliedEffect(type: StatusEffectType.exposed, duration: -1, magnitude: 20),
+        ],
       ),
       Ability(
         name: 'Shadow Bolt',
@@ -686,7 +691,9 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 1,
         isBasicAttack: true,
-        enemyAttackDebuffPercent: 10,
+        appliesStatusEffects: [
+          AppliedEffect(type: StatusEffectType.weakened, duration: -1, magnitude: 10),
+        ],
       ),
       Ability(
         name: 'Rejuvenate',
@@ -704,8 +711,9 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 45,
         targetType: AbilityTarget.allEnemies,
         unlockedAtLevel: 4,
-        tempEnemyAttackDebuffPercent: 50,
-        debuffDuration: 2,
+        appliesStatusEffects: [
+          AppliedEffect(type: StatusEffectType.weakened, duration: 2, magnitude: 50),
+        ],
       ),
       Ability(
         name: 'Wild Growth',
@@ -754,7 +762,9 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 1,
         isBasicAttack: true,
-        stunChance: 20,
+        appliesStatusEffects: [
+          AppliedEffect(type: StatusEffectType.stunned, duration: 1, chance: 20),
+        ],
       ),
       Ability(
         name: 'Flurry of Blows',
@@ -763,7 +773,9 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 55,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 2,
-        stunChance: 30,
+        appliesStatusEffects: [
+          AppliedEffect(type: StatusEffectType.stunned, duration: 1, chance: 30),
+        ],
       ),
       Ability(
         name: 'Inner Peace',
@@ -781,7 +793,9 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 40,
         targetType: AbilityTarget.allEnemies,
         unlockedAtLevel: 7,
-        stunChance: 25,
+        appliesStatusEffects: [
+          AppliedEffect(type: StatusEffectType.stunned, duration: 1, chance: 25),
+        ],
       ),
       Ability(
         name: 'Quivering Palm',
@@ -791,7 +805,9 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 20,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 11,
-        stunChance: 50,
+        appliesStatusEffects: [
+          AppliedEffect(type: StatusEffectType.stunned, duration: 1, chance: 50),
+        ],
       ),
     ],
   ),

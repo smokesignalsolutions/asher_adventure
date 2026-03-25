@@ -5,6 +5,7 @@ import '../../models/character.dart';
 import '../../models/enemy.dart';
 import '../../models/enums.dart';
 import '../../models/equipment.dart';
+import '../../models/status_effect.dart';
 import 'character_detail_card.dart';
 
 void showCharacterHelp(BuildContext context, Character character) {
@@ -132,23 +133,19 @@ void showAbilityHelp(BuildContext context, Ability ability) {
         effects.add('Heals ${ability.healPercentMaxHp}% of max HP');
       }
       if (ability.lifeDrain) effects.add('Life Drain (heals 50% of damage)');
-      if (ability.appliesVulnerability) {
-        effects.add('Applies Vulnerability (5-15% extra damage)');
-      }
-      if (ability.stunChance > 0) {
-        effects.add('${ability.stunChance}% chance to stun');
+      for (final fx in ability.appliesStatusEffects) {
+        final label = StatusEffect(type: fx.type, duration: fx.duration, magnitude: fx.magnitude).displayName;
+        if (fx.chance < 100) {
+          effects.add('${fx.chance}% chance: $label${fx.magnitude > 0 ? ' (${fx.magnitude}%)' : ''}');
+        } else {
+          effects.add('Applies $label${fx.magnitude > 0 ? ' (${fx.magnitude}%)' : ''}');
+        }
       }
       if (ability.attackBuffPercent > 0) {
         effects.add('+${ability.attackBuffPercent}% ATK buff');
       }
       if (ability.defenseBuffPercent > 0) {
         effects.add('+${ability.defenseBuffPercent}% DEF buff');
-      }
-      if (ability.enemyAttackDebuffPercent > 0) {
-        effects.add('-${ability.enemyAttackDebuffPercent}% enemy ATK');
-      }
-      if (ability.enemyDefenseDebuffPercent > 0) {
-        effects.add('-${ability.enemyDefenseDebuffPercent}% enemy DEF');
       }
       if (ability.grantCasterDefensePercent > 0) {
         effects.add('Grants ${ability.grantCasterDefensePercent}% of caster DEF');
