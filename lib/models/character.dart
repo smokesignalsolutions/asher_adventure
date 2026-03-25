@@ -1,6 +1,7 @@
 import 'ability.dart';
 import 'enums.dart';
 import 'equipment.dart';
+import 'status_effect.dart';
 
 class CharacterStats {
   final int hp;
@@ -34,7 +35,7 @@ class CharacterStats {
   );
 }
 
-class Character {
+class Character with StatusEffectMixin {
   final String id;
   final String name;
   final CharacterClass characterClass;
@@ -58,6 +59,8 @@ class Character {
   bool? lastAttackWasPhysical; // spellsword: track alternation (combat-only)
   bool isFrontLine; // front line characters are targeted more often
   int skeletonCount; // necromancer: active skeleton minions (combat-only)
+  @override
+  List<StatusEffect> statusEffects;
 
   Character({
     required this.id,
@@ -83,7 +86,9 @@ class Character {
     this.lastAttackWasPhysical,
     this.isFrontLine = true,
     this.skeletonCount = 0,
-  }) : equipment = equipment ?? {
+    List<StatusEffect>? statusEffects,
+  }) : statusEffects = statusEffects ?? [],
+       equipment = equipment ?? {
          for (var slot in EquipmentSlot.values) slot: null,
        },
        abilities = abilities ?? [],
@@ -100,18 +105,35 @@ class Character {
       final missingRatio = 1 - (currentHp / totalMaxHp);
       base += (attack * missingRatio * 0.5).round();
     }
+    // Status effect: weakened reduces damage dealt
+    final weakenedPercent = getStrongestDebuff(StatusEffectType.weakened);
+    if (weakenedPercent > 0) {
+      base = (base * (1 - weakenedPercent / 100)).round();
+    }
     return base;
   }
 
-  int get totalDefense =>
-      ((defense + combatDefenseBonus +
+  int get totalDefense {
+    var base = ((defense + combatDefenseBonus +
       equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.defenseBonus)) *
       combatDefenseMultiplier).round();
+    final exposedPercent = getStrongestDebuff(StatusEffectType.exposed);
+    if (exposedPercent > 0) {
+      base = (base * (1 - exposedPercent / 100)).round();
+    }
+    return base;
+  }
 
-  int get totalSpeed =>
-      ((speed +
+  int get totalSpeed {
+    var base = ((speed +
       equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.speedBonus)) *
       combatSpeedMultiplier).round();
+    final slowedPercent = getStrongestDebuff(StatusEffectType.slowed);
+    if (slowedPercent > 0) {
+      base = (base * (1 - slowedPercent / 100)).round();
+    }
+    return base;
+  }
 
   int get totalMagic =>
       ((magic +
