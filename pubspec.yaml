@@ -57,6 +57,7 @@ flutter:
 
   assets:
     - assets/new_art/
+    - assets/maps/
     - assets/sprites/abilities/
     - assets/sprites/backgrounds/
     - assets/audio/music/
