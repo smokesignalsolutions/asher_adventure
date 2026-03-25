@@ -12,6 +12,7 @@ import '../../../models/character.dart';
 import '../../../models/combat_state.dart';
 import '../../../models/enemy.dart';
 import '../../../models/enums.dart';
+import '../../../models/status_effect.dart';
 import '../../../models/summon_effect.dart';
 import '../../../data/map_backgrounds.dart';
 import '../../../providers/audio_provider.dart';
@@ -1479,6 +1480,16 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                   shadows: const [Shadow(color: Colors.black, blurRadius: 2)],
                 ),
               ),
+              if (ally.statusEffects.isNotEmpty)
+                Text(
+                  ally.activeStatusLabels.map((e) => e.$1).join(' · '),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 8,
+                    color: _statusColor(ally.activeStatusLabels.first.$2),
+                    shadows: [const Shadow(color: Colors.black, blurRadius: 2)],
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
             ] else
               Text(
                 'KO',
@@ -1558,6 +1569,16 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                   shadows: const [Shadow(color: Colors.black, blurRadius: 2)],
                 ),
               ),
+              if (enemy.statusEffects.isNotEmpty)
+                Text(
+                  enemy.activeStatusLabels.map((e) => e.$1).join(' · '),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 8,
+                    color: _statusColor(enemy.activeStatusLabels.first.$2),
+                    shadows: [const Shadow(color: Colors.black, blurRadius: 2)],
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
             ] else
               Text(
                 'Defeated',
@@ -1913,6 +1934,26 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         ],
       ),
     );
+  }
+
+  Color _statusColor(StatusEffectType type) {
+    switch (type) {
+      case StatusEffectType.poisoned:
+      case StatusEffectType.burning:
+      case StatusEffectType.bleeding:
+        return Colors.red.shade300;
+      case StatusEffectType.weakened:
+      case StatusEffectType.exposed:
+      case StatusEffectType.slowed:
+      case StatusEffectType.vulnerable:
+        return Colors.yellow.shade200;
+      case StatusEffectType.stunned:
+      case StatusEffectType.blinded:
+      case StatusEffectType.silenced:
+      case StatusEffectType.frozen:
+      case StatusEffectType.cursed:
+        return Colors.cyan.shade200;
+    }
   }
 
   Color _hpColor(double ratio) {
