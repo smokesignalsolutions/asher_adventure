@@ -1,5 +1,6 @@
 import 'dart:math';
 import '../data/class_data.dart';
+import '../data/map_data.dart';
 import '../models/ability.dart';
 import '../models/character.dart';
 import '../models/combat_state.dart';
@@ -17,16 +18,32 @@ class CombatService {
     return rounded + classModifier + speed / 4;
   }
 
-  static CombatState initCombat(List<Character> party, List<Enemy> enemies) {
+  static CombatState initCombat(List<Character> party, List<Enemy> enemies, {int? mapDefinitionId}) {
     // Reset combat-only buffs & auto-assign front/back line by class
     for (final char in party) {
       char.combatAttackMultiplier = 1.0;
       char.combatDefenseMultiplier = 1.0;
+      char.combatSpeedMultiplier = 1.0;
+      char.combatMagicMultiplier = 1.0;
       char.combatDefenseBonus = 0;
       char.activeSummons = [];
       char.lastAttackWasPhysical = null;
       char.isFrontLine = !magicDamageClasses.contains(char.characterClass);
       char.skeletonCount = 0;
+    }
+
+    // Apply map-specific class modifiers
+    if (mapDefinitionId != null) {
+      final mapDef = getMapDefinition(mapDefinitionId);
+      for (final char in party) {
+        final mod = mapDef.classModifiers[char.characterClass];
+        if (mod != null) {
+          char.combatAttackMultiplier += mod.atkPercent / 100;
+          char.combatDefenseMultiplier += mod.defPercent / 100;
+          char.combatSpeedMultiplier += mod.spdPercent / 100;
+          char.combatMagicMultiplier += mod.magPercent / 100;
+        }
+      }
     }
 
     final turnOrder = buildGroupedTurnOrder(party, enemies);

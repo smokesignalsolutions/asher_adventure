@@ -51,6 +51,8 @@ class Character {
   int shieldHp;
   double combatAttackMultiplier; // combat-only, resets each fight
   double combatDefenseMultiplier; // combat-only, resets each fight
+  double combatSpeedMultiplier; // combat-only, resets each fight
+  double combatMagicMultiplier; // combat-only, resets each fight
   int combatDefenseBonus; // flat defense bonus from abilities like Holy Guard
   List<String> activeSummons; // summoner: persistent summon IDs (combat-only)
   bool? lastAttackWasPhysical; // spellsword: track alternation (combat-only)
@@ -74,6 +76,8 @@ class Character {
     this.shieldHp = 0,
     this.combatAttackMultiplier = 1.0,
     this.combatDefenseMultiplier = 1.0,
+    this.combatSpeedMultiplier = 1.0,
+    this.combatMagicMultiplier = 1.0,
     this.combatDefenseBonus = 0,
     List<String>? activeSummons,
     this.lastAttackWasPhysical,
@@ -105,12 +109,14 @@ class Character {
       combatDefenseMultiplier).round();
 
   int get totalSpeed =>
-      speed +
-      equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.speedBonus);
+      ((speed +
+      equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.speedBonus)) *
+      combatSpeedMultiplier).round();
 
   int get totalMagic =>
-      magic +
-      equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.magicBonus);
+      ((magic +
+      equipment.values.where((e) => e != null).fold(0, (sum, e) => sum + e!.magicBonus)) *
+      combatMagicMultiplier).round();
 
   int get totalMaxHp =>
       maxHp +

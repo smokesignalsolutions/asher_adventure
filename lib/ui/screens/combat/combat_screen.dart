@@ -142,7 +142,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     }
 
     setState(() {
-      _combat = CombatService.initCombat(gameState.party, enemies);
+      _combat = CombatService.initCombat(gameState.party, enemies, mapDefinitionId: gameState.currentMapDefinitionId);
       _processNextTurn();
     });
   }
