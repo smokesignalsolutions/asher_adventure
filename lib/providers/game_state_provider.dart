@@ -5,7 +5,6 @@ import 'package:uuid/uuid.dart';
 import '../data/class_data.dart';
 import '../data/enemy_data.dart';
 import '../data/name_generator.dart';
-import '../models/ability.dart';
 import '../models/character.dart';
 import '../models/enemy.dart';
 import '../models/enums.dart';
@@ -209,15 +208,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     xpReward: template.xpReward,
     goldReward: template.goldReward,
     abilities: template.abilities
-        .map((a) => Ability(
-              name: a.name,
-              description: a.description,
-              damage: a.damage,
-              refreshChance: a.refreshChance,
-              targetType: a.targetType,
-              unlockedAtLevel: a.unlockedAtLevel,
-              isBasicAttack: a.isBasicAttack,
-            ))
+        .map((a) => a.copyWith())
         .toList(),
   );
 
@@ -256,15 +247,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       xpReward: bossTemplate.xpReward,
       goldReward: bossTemplate.goldReward,
       abilities: bossTemplate.abilities
-          .map((a) => Ability(
-                name: a.name,
-                description: a.description,
-                damage: a.damage,
-                refreshChance: a.refreshChance,
-                targetType: a.targetType,
-                unlockedAtLevel: a.unlockedAtLevel,
-                isBasicAttack: a.isBasicAttack,
-              ))
+          .map((a) => a.copyWith())
           .toList(),
     );
     final enemies = <Enemy>[boss];
@@ -347,30 +330,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
 
     return List.generate(count, (_) {
       final template = templates[_random.nextInt(templates.length)];
-      return Enemy(
-        id: _uuid.v4(),
-        name: template.name,
-        type: template.type,
-        currentHp: template.hp,
-        maxHp: template.hp,
-        attack: template.attack,
-        defense: template.defense,
-        speed: template.speed,
-        magic: template.magic,
-        xpReward: template.xpReward,
-        goldReward: template.goldReward,
-        abilities: template.abilities
-            .map((a) => Ability(
-                  name: a.name,
-                  description: a.description,
-                  damage: a.damage,
-                  refreshChance: a.refreshChance,
-                  targetType: a.targetType,
-                  unlockedAtLevel: a.unlockedAtLevel,
-                  isBasicAttack: a.isBasicAttack,
-                ))
-            .toList(),
-      );
+      return _enemyFromTemplate(template);
     });
   }
 

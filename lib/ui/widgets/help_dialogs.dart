@@ -30,14 +30,13 @@ void showEnemyHelp(BuildContext context, Enemy enemy) {
     context: context,
     builder: (context) {
       final theme = Theme.of(context);
-      final statusEffects = <String>[];
-      if (enemy.isVulnerable) statusEffects.add('Vulnerable');
-      if (enemy.isStunned) statusEffects.add('Stunned');
-      if (enemy.attackMultiplier != 1.0) {
-        statusEffects.add('ATK x${enemy.attackMultiplier.toStringAsFixed(2)}');
+      final statusLabels = enemy.activeStatusLabels;
+      final statusEffects = statusLabels.map((e) => e.$1).toList();
+      if (enemy.enrageMultiplier != 1.0) {
+        statusEffects.add('ATK x${enemy.enrageMultiplier.toStringAsFixed(2)}');
       }
-      if (enemy.defenseMultiplier != 1.0) {
-        statusEffects.add('DEF x${enemy.defenseMultiplier.toStringAsFixed(2)}');
+      if (enemy.baseDefenseMultiplier != 1.0) {
+        statusEffects.add('DEF x${enemy.baseDefenseMultiplier.toStringAsFixed(2)}');
       }
 
       return AlertDialog(

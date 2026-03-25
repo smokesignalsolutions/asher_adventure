@@ -177,6 +177,18 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         _advanceTurn();
         return;
       }
+
+      // Process ally status effects at turn start
+      final (canAct, statusLogs) = CombatService.processAllyTurnStart(char);
+      _combat!.combatLog.addAll(statusLogs);
+      if (!canAct) {
+        // Stunned/frozen — skip turn
+        setState(() {});
+        _scrollLog();
+        _advanceTurn();
+        return;
+      }
+
       // Druid passive: Nature's Blessing — heal all alive allies for a small amount
       if (char.characterClass == CharacterClass.druid) {
         final heal = 3 + char.totalMagic ~/ 5;
@@ -438,7 +450,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
       // Boss enrage: after round 15, enemies get +10% attack per round
       if (_isBossFight && _combat!.roundNumber > 15) {
         for (final enemy in _combat!.enemies.where((e) => e.isAlive)) {
-          enemy.attackMultiplier = (enemy.attackMultiplier * 1.10);
+          enemy.enrageMultiplier = (enemy.enrageMultiplier * 1.10);
         }
         _combat!.combatLog.add('The enemy grows stronger! (Enrage!)');
       }
@@ -485,6 +497,25 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     if (_combat == null) return;
     final current = _combat!.currentCombatant;
     final char = _combat!.allies.firstWhere((c) => c.id == current.id);
+
+    // Blinded miss check — offensive abilities only
+    if (ability.damage > 0 &&
+        char.blindedMissChance > 0 &&
+        CombatService.rollBlindedMiss(char.blindedMissChance)) {
+      _combat!.combatLog.add('${char.name}\'s attack misses!');
+      if (!ability.isBasicAttack) ability.isAvailable = false;
+
+      // Process ally turn-end effects
+      CombatService.processAllyTurnEnd(char);
+
+      setState(() {
+        _waitingForInput = false;
+        _selectedAbility = null;
+      });
+      _scrollLog();
+      _animateLines(holdMs: 300, onDone: _advanceTurn);
+      return;
+    }
 
     // Snapshot HP before action
     final enemyHpBefore = {for (final e in _combat!.enemies) e.id: e.currentHp};
@@ -739,6 +770,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     });
     _scrollLog();
 
+    // Process ally turn-end effects (decrement durations, remove expired)
+    CombatService.processAllyTurnEnd(char);
+
     // Skeleton attacks immediately when summoned
     if (ability.summonId == 'skeleton') {
       _animateLines(
@@ -906,6 +940,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     final abilities = char.abilities
         .where((a) => a.unlockedAtLevel <= char.level)
         .toList();
+    final available = CombatService.getAvailableAbilities(abilities, char.isSilenced);
 
     int? index;
     if (event.logicalKey == LogicalKeyboardKey.digit1) index = 0;
@@ -916,7 +951,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
 
     if (index == null || index >= abilities.length) return;
     final ability = abilities[index];
-    if (!ability.isAvailable) return;
+    if (!available.contains(ability)) return;
 
     // Same logic as the tap handler
     setState(() {
@@ -1552,6 +1587,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     final abilities = char.abilities
         .where((a) => a.unlockedAtLevel <= char.level)
         .toList();
+    final available = CombatService.getAvailableAbilities(abilities, char.isSilenced);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
@@ -1634,7 +1670,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                   final index = entry.key;
                   final ability = entry.value;
                   final isSelected = _selectedAbility?.name == ability.name;
-                  final canUse = ability.isAvailable;
+                  final canUse = available.contains(ability);
 
                   return _buildAbilityBox(
                     theme: theme,
