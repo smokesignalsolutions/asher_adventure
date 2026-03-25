@@ -1,6 +1,7 @@
 import 'ability.dart';
+import 'status_effect.dart';
 
-class Enemy {
+class Enemy with StatusEffectMixin {
   final String id;
   final String name;
   final String type;
@@ -13,12 +14,10 @@ class Enemy {
   final int xpReward;
   final int goldReward;
   final List<Ability> abilities;
-  bool isVulnerable; // takes 5-15% extra damage from all attacks
-  double attackMultiplier; // permanent debuff by Hex etc.
-  double defenseMultiplier; // permanent debuff by Hex etc.
-  double tempAttackMultiplier; // temporary debuff (e.g. Entangle)
-  int tempAttackDebuffTurns; // turns remaining on temp debuff
-  bool isStunned; // skips next turn
+  double enrageMultiplier; // boss enrage + shadow summon reduction
+  double baseDefenseMultiplier; // for future use
+  @override
+  List<StatusEffect> statusEffects;
 
   Enemy({
     required this.id,
@@ -33,18 +32,38 @@ class Enemy {
     required this.xpReward,
     required this.goldReward,
     required this.abilities,
-    this.isVulnerable = false,
-    this.attackMultiplier = 1.0,
-    this.defenseMultiplier = 1.0,
-    this.tempAttackMultiplier = 1.0,
-    this.tempAttackDebuffTurns = 0,
-    this.isStunned = false,
-  });
+    this.enrageMultiplier = 1.0,
+    this.baseDefenseMultiplier = 1.0,
+    List<StatusEffect>? statusEffects,
+  }) : statusEffects = statusEffects ?? [];
 
   bool get isAlive => currentHp > 0;
 
-  int get effectiveAttack => (attack * attackMultiplier * tempAttackMultiplier).round();
-  int get effectiveDefense => (defense * defenseMultiplier).round();
+  int get effectiveAttack {
+    var base = (attack * enrageMultiplier).round();
+    final weakenedPercent = getStrongestDebuff(StatusEffectType.weakened);
+    if (weakenedPercent > 0) {
+      base = (base * (1 - weakenedPercent / 100)).round();
+    }
+    return base;
+  }
+
+  int get effectiveDefense {
+    var base = (defense * baseDefenseMultiplier).round();
+    final exposedPercent = getStrongestDebuff(StatusEffectType.exposed);
+    if (exposedPercent > 0) {
+      base = (base * (1 - exposedPercent / 100)).round();
+    }
+    return base;
+  }
+
+  int get effectiveSpeed {
+    final slowedPercent = getStrongestDebuff(StatusEffectType.slowed);
+    if (slowedPercent > 0) {
+      return (speed * (1 - slowedPercent / 100)).round();
+    }
+    return speed;
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
