@@ -1,0 +1,167 @@
+<h2>Class Accordion Layout</h2>
+<p class="subtitle">How should abilities and story timeline sit inside the expanded accordion?</p>
+
+<div class="cards">
+  <!-- Option A: Side by side -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;border-radius:8px;padding:16px;font-family:monospace;font-size:11px;color:#ccc;">
+        <!-- Collapsed header -->
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#2a2a4a;border-radius:6px;margin-bottom:12px;">
+          <div style="width:32px;height:32px;background:#555;border-radius:4px;display:flex;align-items:center;justify-content:center;">⚔️</div>
+          <div>
+            <div style="color:#fff;font-weight:bold;">Fighter <span style="background:#4a6fa5;padding:1px 6px;border-radius:8px;font-size:9px;">Starter</span></div>
+            <div style="font-size:9px;color:#888;">HP:50 ATK:12 DEF:8 SPD:6 MAG:2</div>
+          </div>
+        </div>
+        <!-- Expanded: two columns -->
+        <div style="display:flex;gap:16px;">
+          <!-- Left: Abilities -->
+          <div style="flex:1;min-width:0;">
+            <div style="color:#8af;font-weight:bold;margin-bottom:6px;font-size:10px;">ABILITIES</div>
+            <div style="background:#222240;border-radius:4px;padding:6px 8px;margin-bottom:4px;">
+              <div style="color:#fff;font-size:10px;">Strike <span style="color:#666;font-size:8px;">Basic</span></div>
+              <div style="font-size:8px;color:#f90;">Dmg 12 · Single Enemy</div>
+            </div>
+            <div style="background:#222240;border-radius:4px;padding:6px 8px;margin-bottom:4px;">
+              <div style="color:#fff;font-size:10px;">Shield Bash</div>
+              <div style="font-size:8px;color:#f90;">Dmg 8 · Single Enemy · 60%</div>
+            </div>
+            <div style="background:#222240;border-radius:4px;padding:6px 8px;margin-bottom:4px;">
+              <div style="color:#fff;font-size:10px;">Whirlwind</div>
+              <div style="font-size:8px;color:#f90;">Dmg 10 · All Enemies · 50%</div>
+            </div>
+            <div style="background:#222240;border-radius:4px;padding:6px 8px;margin-bottom:4px;">
+              <div style="color:#fff;font-size:10px;">Rallying Cry</div>
+              <div style="font-size:8px;color:#0c6;">Heal 8 · All Allies · 45%</div>
+            </div>
+            <div style="background:#222240;border-radius:4px;padding:6px 8px;">
+              <div style="color:#fff;font-size:10px;">Devastating Blow</div>
+              <div style="font-size:8px;color:#f90;">Dmg 20 · Single Enemy · 40%</div>
+            </div>
+          </div>
+          <!-- Right: Story Timeline -->
+          <div style="flex:1;min-width:0;position:relative;">
+            <div style="color:#8af;font-weight:bold;margin-bottom:6px;font-size:10px;">BACKSTORY</div>
+            <!-- Timeline line -->
+            <div style="position:absolute;left:8px;top:24px;bottom:8px;width:2px;background:linear-gradient(to bottom,#4a6fa5 30%,#333 30%);"></div>
+            <!-- Chapter 1: Unlocked -->
+            <div style="display:flex;gap:8px;margin-bottom:6px;position:relative;">
+              <div style="width:16px;height:16px;background:#4a6fa5;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;z-index:1;">1</div>
+              <div style="background:#222240;border-radius:4px;padding:6px 8px;flex:1;border-left:2px solid #4a6fa5;">
+                <div style="color:#fff;font-size:10px;font-weight:bold;">The Broken Sword</div>
+                <div style="font-size:8px;color:#aaa;line-height:1.3;">Every fighter begins with a weapon passed down through generations...</div>
+              </div>
+            </div>
+            <!-- Chapter 2: Unlocked -->
+            <div style="display:flex;gap:8px;margin-bottom:6px;position:relative;">
+              <div style="width:16px;height:16px;background:#4a6fa5;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;z-index:1;">2</div>
+              <div style="background:#222240;border-radius:4px;padding:6px 8px;flex:1;border-left:2px solid #4a6fa5;">
+                <div style="color:#fff;font-size:10px;font-weight:bold;">The Shield Wall</div>
+                <div style="font-size:8px;color:#aaa;line-height:1.3;">At Fort Ironhold, you learned that true strength is not in the arm...</div>
+              </div>
+            </div>
+            <!-- Chapter 3: Locked -->
+            <div style="display:flex;gap:8px;margin-bottom:6px;position:relative;">
+              <div style="width:16px;height:16px;background:#444;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;z-index:1;">3</div>
+              <div style="background:#1a1a2a;border-radius:4px;padding:6px 8px;flex:1;border-left:2px solid #333;">
+                <div style="color:#555;font-size:10px;">Chapter 3: Not unlocked</div>
+              </div>
+            </div>
+            <!-- Chapters 4-8: Locked (condensed) -->
+            <div style="display:flex;gap:8px;margin-bottom:6px;position:relative;">
+              <div style="width:16px;height:16px;background:#444;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;z-index:1;">4</div>
+              <div style="background:#1a1a2a;border-radius:4px;padding:6px 8px;flex:1;border-left:2px solid #333;">
+                <div style="color:#555;font-size:10px;">Chapter 4: Not unlocked</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:6px;position:relative;">
+              <div style="width:16px;height:16px;background:#444;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;z-index:1;">5</div>
+              <div style="background:#1a1a2a;border-radius:4px;padding:6px 8px;flex:1;border-left:2px solid #333;">
+                <div style="color:#555;font-size:10px;">Chapter 5: Not unlocked</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:6px;position:relative;">
+              <div style="width:16px;height:16px;background:#444;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;z-index:1;">6</div>
+              <div style="background:#1a1a2a;border-radius:4px;padding:6px 8px;flex:1;border-left:2px solid #333;">
+                <div style="color:#555;font-size:10px;">Chapter 6: Not unlocked</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:6px;position:relative;">
+              <div style="width:16px;height:16px;background:#444;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;z-index:1;">7</div>
+              <div style="background:#1a1a2a;border-radius:4px;padding:6px 8px;flex:1;border-left:2px solid #333;">
+                <div style="color:#555;font-size:10px;">Chapter 7: Not unlocked</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;position:relative;">
+              <div style="width:16px;height:16px;background:#444;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#666;z-index:1;">8</div>
+              <div style="background:#1a1a2a;border-radius:4px;padding:6px 8px;flex:1;border-left:2px solid #333;">
+                <div style="color:#555;font-size:10px;">Chapter 8: Not unlocked</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A: Side by Side</h3>
+      <p>Abilities column on the left, story timeline on the right. Both visible at once. Works well on wider screens (tablet/desktop). On narrow screens the columns would stack vertically.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Stacked with tabs -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;border-radius:8px;padding:16px;font-family:monospace;font-size:11px;color:#ccc;">
+        <!-- Collapsed header -->
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#2a2a4a;border-radius:6px;margin-bottom:12px;">
+          <div style="width:32px;height:32px;background:#555;border-radius:4px;display:flex;align-items:center;justify-content:center;">⚔️</div>
+          <div>
+            <div style="color:#fff;font-weight:bold;">Fighter <span style="background:#4a6fa5;padding:1px 6px;border-radius:8px;font-size:9px;">Starter</span></div>
+            <div style="font-size:9px;color:#888;">HP:50 ATK:12 DEF:8 SPD:6 MAG:2</div>
+          </div>
+        </div>
+        <!-- Tabs -->
+        <div style="display:flex;gap:0;margin-bottom:12px;">
+          <div style="flex:1;padding:6px;text-align:center;background:#222240;border-bottom:2px solid #333;color:#666;font-size:10px;">Abilities</div>
+          <div style="flex:1;padding:6px;text-align:center;background:#2a2a4a;border-bottom:2px solid #4a6fa5;color:#fff;font-size:10px;font-weight:bold;">Backstory</div>
+        </div>
+        <!-- Story Timeline (active tab) -->
+        <div style="position:relative;padding-left:4px;">
+          <div style="position:absolute;left:11px;top:8px;bottom:8px;width:2px;background:linear-gradient(to bottom,#4a6fa5 25%,#333 25%);"></div>
+          <div style="display:flex;gap:8px;margin-bottom:8px;position:relative;">
+            <div style="width:20px;height:20px;background:#4a6fa5;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;z-index:1;">1</div>
+            <div style="background:#222240;border-radius:4px;padding:8px 10px;flex:1;border-left:2px solid #4a6fa5;">
+              <div style="color:#fff;font-size:11px;font-weight:bold;">The Broken Sword</div>
+              <div style="font-size:9px;color:#aaa;line-height:1.4;margin-top:2px;">Every fighter begins with a weapon passed down through generations. Yours was shattered in the first battle...</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:8px;position:relative;">
+            <div style="width:20px;height:20px;background:#4a6fa5;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;z-index:1;">2</div>
+            <div style="background:#222240;border-radius:4px;padding:8px 10px;flex:1;border-left:2px solid #4a6fa5;">
+              <div style="color:#fff;font-size:11px;font-weight:bold;">The Shield Wall</div>
+              <div style="font-size:9px;color:#aaa;line-height:1.4;margin-top:2px;">At Fort Ironhold, you learned that true strength is not in the arm that swings the sword...</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:8px;position:relative;">
+            <div style="width:20px;height:20px;background:#444;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#666;z-index:1;">3</div>
+            <div style="background:#1a1a2a;border-radius:4px;padding:8px 10px;flex:1;border-left:2px solid #333;">
+              <div style="color:#555;font-size:11px;">Chapter 3: Not unlocked</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:8px;position:relative;">
+            <div style="width:20px;height:20px;background:#444;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#666;z-index:1;">4</div>
+            <div style="background:#1a1a2a;border-radius:4px;padding:8px 10px;flex:1;border-left:2px solid #333;">
+              <div style="color:#555;font-size:11px;">Chapter 4: Not unlocked</div>
+            </div>
+          </div>
+          <div style="text-align:center;color:#444;font-size:9px;padding:4px;">· · · chapters 5–8 · · ·</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B: Tabbed (Abilities / Backstory)</h3>
+      <p>Toggle between Abilities and Backstory tabs within the accordion. Full width for each view. Better for phone screens since each section gets the full width. Only one visible at a time.</p>
+    </div>
+  </div>
+</div>
