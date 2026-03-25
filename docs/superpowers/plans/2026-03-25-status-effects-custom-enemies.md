@@ -598,6 +598,13 @@ In `initCombat` (line 21), after `char.skeletonCount = 0;` (line 32), add:
       char.clearStatusEffects();
 ```
 
+Also add a loop after the party reset to clear enemy status effects (defensive, per spec):
+```dart
+    for (final enemy in enemies) {
+      enemy.clearStatusEffects();
+    }
+```
+
 - [ ] **Step 3: Update `calculateDamage` — replace `targetVulnerable` bool with `vulnerableMagnitude` int**
 
 Change signature (line 132):
@@ -617,7 +624,8 @@ Change signature (line 132):
 Replace the vulnerability bonus block (lines 146-149):
 ```dart
     if (vulnerableMagnitude > 0) {
-      final bonus = 1.0 + (5 + _random.nextInt(vulnerableMagnitude - 4)) / 100;
+      final rollMax = max(1, vulnerableMagnitude - 4);
+      final bonus = 1.0 + (5 + _random.nextInt(rollMax)) / 100;
       result = (result * bonus).round();
     }
     if (frozenBonusDamage > 0) {
@@ -628,14 +636,14 @@ Replace the vulnerability bonus block (lines 146-149):
 - [ ] **Step 4: Update all `calculateDamage` call sites in combat_service.dart**
 
 Replace `targetVulnerable: enemyTarget.isVulnerable` with `vulnerableMagnitude: enemyTarget.vulnerableMagnitude` in:
-- `executeAllyTurn` (around line 342)
-- `executeChaoticBounce` (around line 198)
-- `executePierce` (around line 223)
-- `executeRogueDualStrike` (around line 264)
+- `executeAllyTurn` (around line 342): also add `frozenBonusDamage: enemyTarget.frozenBonusDamage`. After the damage loop, if frozen bonus was applied, call `enemyTarget.shatterFrozen()` and log `'${enemyTarget.name} takes bonus damage from being frozen!'`
+- `executeChaoticBounce` (around line 198): add `vulnerableMagnitude: target.vulnerableMagnitude, frozenBonusDamage: target.frozenBonusDamage`. Call `target.shatterFrozen()` after if frozen.
+- `executePierce` (around line 223): same pattern
+- `executeRogueDualStrike` (around line 264): same pattern
 
-For enemy-on-ally attacks in `executeEnemyTurn`, add vulnerability check:
-- Single-target attack (around line 822): add `vulnerableMagnitude: target.vulnerableMagnitude`
-- AOE attack (around line 745): add `vulnerableMagnitude: ally.vulnerableMagnitude`
+For enemy-on-ally attacks in `executeEnemyTurn`, add vulnerability and frozen checks:
+- Single-target attack (around line 822): add `vulnerableMagnitude: target.vulnerableMagnitude, frozenBonusDamage: target.frozenBonusDamage`. After damage, if target was frozen, call `target.shatterFrozen()` and log.
+- AOE attack (around line 745): add `vulnerableMagnitude: ally.vulnerableMagnitude, frozenBonusDamage: ally.frozenBonusDamage`. Same shatter pattern per ally.
 
 - [ ] **Step 5: Update `executeAllyTurn` — migrate debuff application to status effects**
 
@@ -659,7 +667,9 @@ Replace the debuff block (lines 405-439) with status effect application:
         }
       }
 
-      // Legacy debuff fields (will be removed once class_data.dart is migrated)
+      // Legacy debuff fields (will be removed once class_data.dart is migrated in Task 8.5)
+      // Boss resistance applies here too: duration -1 for bosses (min 1)
+      final isBoss = enemyTarget.type == 'boss';
       if (ability.appliesVulnerability && enemyTarget.vulnerableMagnitude == 0) {
         enemyTarget.addStatusEffect(StatusEffect(
           type: StatusEffectType.vulnerable,
@@ -689,22 +699,24 @@ Replace the debuff block (lines 405-439) with status effect application:
       }
       if (ability.stunChance > 0 && enemyTarget.isAlive && !enemyTarget.isStunned) {
         if (_random.nextInt(100) < ability.stunChance) {
+          final stunDur = isBoss ? 1 : 1; // stun is already 1 turn, boss min is 1
           enemyTarget.addStatusEffect(StatusEffect(
             type: StatusEffectType.stunned,
-            duration: 1,
+            duration: stunDur,
             sourceId: attacker.id,
           ));
           logs.add('${enemyTarget.name} is stunned!');
         }
       }
       if (ability.tempEnemyAttackDebuffPercent > 0) {
+        final dur = isBoss ? max(1, ability.debuffDuration - 1) : ability.debuffDuration;
         enemyTarget.addStatusEffect(StatusEffect(
           type: StatusEffectType.weakened,
-          duration: ability.debuffDuration,
+          duration: dur,
           magnitude: ability.tempEnemyAttackDebuffPercent,
           sourceId: attacker.id,
         ));
-        logs.add('${enemyTarget.name} attack reduced by ${ability.tempEnemyAttackDebuffPercent}% for ${ability.debuffDuration} turns!');
+        logs.add('${enemyTarget.name} attack reduced by ${ability.tempEnemyAttackDebuffPercent}% for $dur turns!');
       }
 ```
 
@@ -712,15 +724,15 @@ Replace the debuff block (lines 405-439) with status effect application:
 
 Replace the stun check and temp debuff tick (lines 695-709) with:
 ```dart
-    // Tick DoTs
+    // Collect DoT types BEFORE ticking (some may be removed after tick)
+    final dotTypes = enemy.statusEffects.where((e) => e.isDot).map((e) => e.type).toSet();
     final dotDamage = enemy.tickDoTs();
     final logs = <String>[];
     if (dotDamage > 0) {
       enemy.currentHp = max(0, enemy.currentHp - dotDamage);
-      // Build per-type dot messages
-      final dotTypes = enemy.statusEffects.where((e) => e.isDot).map((e) => e.type).toSet();
       for (final dt in dotTypes) {
-        logs.add('${enemy.name} takes damage from ${StatusEffect(type: dt, duration: 0).displayName.toLowerCase()}!');
+        final name = StatusEffect(type: dt, duration: 0).displayName;
+        logs.add('$name deals damage to ${enemy.name}!');
       }
       if (!enemy.isAlive) {
         logs.add('${enemy.name} is defeated!');
@@ -791,7 +803,8 @@ Add a new static method to CombatService for processing ally status effects at t
   static (bool canAct, List<String> logs) processAllyTurnStart(Character ally) {
     final logs = <String>[];
 
-    // Tick DoTs
+    // Collect DoT types BEFORE ticking
+    final dotTypes = ally.statusEffects.where((e) => e.isDot).map((e) => e.type).toSet();
     final dotDamage = ally.tickDoTs();
     if (dotDamage > 0) {
       // Absorb with shield first
@@ -802,7 +815,10 @@ Add a new static method to CombatService for processing ally status effects at t
         remaining -= shieldAbsorb;
       }
       ally.currentHp = max(0, ally.currentHp - remaining);
-      logs.add('${ally.name} takes $dotDamage damage from status effects!');
+      for (final dt in dotTypes) {
+        final name = StatusEffect(type: dt, duration: 0).displayName;
+        logs.add('$name deals damage to ${ally.name}!');
+      }
       if (!ally.isAlive) {
         logs.add('${ally.name} falls!');
         return (false, logs);
@@ -901,6 +917,8 @@ In `game_state_provider.dart` (lines 211-221), replace the ability mapping to pa
 
 Do the same in `generateBoss` (lines 258-267).
 
+Also fix `generateArmyEnemies` (around lines 362-371) — it has the same cherry-picking pattern. Change to `a.copyWith()` there too.
+
 - [ ] **Step 2: Update boss enrage to use `enrageMultiplier`**
 
 In `game_state_provider.dart` (around line 438-444), change:
@@ -986,7 +1004,7 @@ After the HP text (around line 1446), add a status effect display:
                   ally.activeStatusLabels.map((e) => e.$1).join(' · '),
                   style: theme.textTheme.labelSmall?.copyWith(
                     fontSize: 8,
-                    color: Colors.yellow.shade200,
+                    color: _statusColor(ally.activeStatusLabels.first.$2),
                     shadows: [const Shadow(color: Colors.black, blurRadius: 2)],
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -1003,11 +1021,36 @@ After the HP text (around line 1525), add the same pattern:
                   enemy.activeStatusLabels.map((e) => e.$1).join(' · '),
                   style: theme.textTheme.labelSmall?.copyWith(
                     fontSize: 8,
-                    color: Colors.yellow.shade200,
+                    color: _statusColor(enemy.activeStatusLabels.first.$2),
                     shadows: [const Shadow(color: Colors.black, blurRadius: 2)],
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
+```
+
+- [ ] **Step 2.5: Add status color helper method to combat screen**
+
+Add a helper method to the combat screen state class:
+```dart
+  Color _statusColor(StatusEffectType type) {
+    switch (type) {
+      case StatusEffectType.poisoned:
+      case StatusEffectType.burning:
+      case StatusEffectType.bleeding:
+        return Colors.red.shade300;
+      case StatusEffectType.weakened:
+      case StatusEffectType.exposed:
+      case StatusEffectType.slowed:
+      case StatusEffectType.vulnerable:
+        return Colors.yellow.shade200;
+      case StatusEffectType.stunned:
+      case StatusEffectType.blinded:
+      case StatusEffectType.silenced:
+      case StatusEffectType.frozen:
+      case StatusEffectType.cursed:
+        return Colors.cyan.shade200;
+    }
+  }
 ```
 
 - [ ] **Step 3: Update boss enrage reference**
@@ -1124,6 +1167,58 @@ Expected: No errors
 ```bash
 git add lib/data/enemy_data.dart
 git commit -m "feat: add special status-effect abilities to all existing enemies and bosses"
+```
+
+---
+
+### Task 8.5: Migrate Player Abilities in class_data.dart
+
+**Files:**
+- Modify: `lib/data/class_data.dart`
+- Modify: `lib/services/combat_service.dart` (remove legacy bridge code)
+- Modify: `lib/models/ability.dart` (remove old debuff fields)
+
+- [ ] **Step 1: Migrate all player abilities that use old debuff fields**
+
+In `lib/data/class_data.dart`, replace each old debuff field usage with `appliesStatusEffects`:
+
+- Line 153 (`appliesVulnerability: true`) → add `appliesStatusEffects: [AppliedEffect(type: StatusEffectType.vulnerable, duration: -1, magnitude: 15)]`, remove `appliesVulnerability: true`
+- Lines 485-486 (`enemyAttackDebuffPercent: 20, enemyDefenseDebuffPercent: 20`) → add `appliesStatusEffects: [AppliedEffect(type: StatusEffectType.weakened, duration: -1, magnitude: 20), AppliedEffect(type: StatusEffectType.exposed, duration: -1, magnitude: 20)]`, remove old fields
+- Line 689 (`enemyAttackDebuffPercent: 10`) → add `appliesStatusEffects: [AppliedEffect(type: StatusEffectType.weakened, duration: -1, magnitude: 10)]`, remove old field
+- Lines 707-708 (`tempEnemyAttackDebuffPercent: 50, debuffDuration: 2`) → add `appliesStatusEffects: [AppliedEffect(type: StatusEffectType.weakened, duration: 2, magnitude: 50)]`, remove old fields
+- Lines 757, 766, 784, 794 (`stunChance: N`) → add `appliesStatusEffects: [AppliedEffect(type: StatusEffectType.stunned, duration: 1, chance: N)]`, remove old field
+
+Add import at top of class_data.dart:
+```dart
+import '../models/status_effect.dart';
+```
+
+- [ ] **Step 2: Remove legacy bridge code from combat_service.dart**
+
+In `executeAllyTurn`, remove the entire "Legacy debuff fields" block (the bridge code that checks `ability.appliesVulnerability`, `ability.enemyAttackDebuffPercent`, etc.). The new `appliesStatusEffects` path handles everything now.
+
+- [ ] **Step 3: Remove old debuff fields from Ability model**
+
+In `lib/models/ability.dart`, remove:
+- `appliesVulnerability` field, constructor param, copyWith, toJson, fromJson
+- `enemyAttackDebuffPercent` field, constructor param, copyWith, toJson, fromJson
+- `enemyDefenseDebuffPercent` field, constructor param, copyWith, toJson, fromJson
+- `tempEnemyAttackDebuffPercent` field, constructor param, copyWith, toJson, fromJson
+- `debuffDuration` field, constructor param, copyWith, toJson, fromJson
+- `stunChance` field, constructor param, copyWith, toJson, fromJson
+
+Keep all other fields (buff fields, lifeDrain, etc.).
+
+- [ ] **Step 4: Verify compiles**
+
+Run: `cd /Users/matthewhelling/smoke/asher_adventure && flutter analyze lib/`
+Expected: No errors
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lib/data/class_data.dart lib/services/combat_service.dart lib/models/ability.dart
+git commit -m "feat: migrate player abilities to appliesStatusEffects, remove legacy debuff fields"
 ```
 
 ---
