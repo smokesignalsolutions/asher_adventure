@@ -2148,12 +2148,14 @@ class _AttackLinePainter extends CustomPainter {
     Color color, {
     int overkill = 0,
   }) {
-    final mid = Offset((from.dx + to.dx) / 2, (from.dy + to.dy) / 2);
+    // Position on the target with a float-up effect
+    final labelOpacity = ((progress - 0.5) * 2).clamp(0.0, 1.0);
+    final floatY = (progress - 0.5).clamp(0.0, 1.0) * 25;
+    final pos = Offset(to.dx, to.dy - 30 - floatY);
     final label = isHealing ? '+$amount' : '-$amount';
     final overkillText = (!isHealing && overkill > 0)
         ? ' ($overkill overkill)'
         : '';
-    final labelOpacity = ((progress - 0.5) * 2).clamp(0.0, 1.0);
     final tp = TextPainter(
       text: TextSpan(
         children: [
@@ -2183,14 +2185,14 @@ class _AttackLinePainter extends CustomPainter {
     final labelW = tp.width + 14;
     final labelH = tp.height + 8;
     final labelRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: mid, width: labelW, height: labelH),
+      Rect.fromCenter(center: pos, width: labelW, height: labelH),
       const Radius.circular(4),
     );
     canvas.drawRRect(
       labelRect,
       Paint()..color = color.withValues(alpha: 0.9 * labelOpacity),
     );
-    tp.paint(canvas, Offset(mid.dx - tp.width / 2, mid.dy - tp.height / 2));
+    tp.paint(canvas, Offset(pos.dx - tp.width / 2, pos.dy - tp.height / 2));
   }
 
   void _paintBurningHands(
