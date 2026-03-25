@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../data/class_stories.dart';
 import '../../../data/codex_data.dart';
 import '../../../data/event_data.dart';
+import '../../../data/map_data.dart';
 import '../../../providers/audio_provider.dart';
 import '../../../providers/game_state_provider.dart';
 import '../../../providers/player_profile_provider.dart';
@@ -36,8 +37,12 @@ class _EventScreenState extends ConsumerState<EventScreen> {
   void initState() {
     super.initState();
     final gameState = ref.read(gameStateProvider);
-    final mapNumber = gameState?.currentMapNumber ?? 1;
-    _event = selectEventForMap(mapNumber);
+    final mapDef = getMapDefinition(gameState?.currentMapDefinitionId ?? 1);
+    final rng = Random();
+    final theme = (mapDef.secondaryEventTheme != null && rng.nextInt(5) == 0)
+        ? mapDef.secondaryEventTheme!
+        : mapDef.eventTheme;
+    _event = selectEventForTheme(theme, rng);
   }
 
   @override

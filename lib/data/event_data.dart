@@ -26,17 +26,6 @@ const Map<String, List<CharacterClass>> themeClassAffinities = {
   'wild': [CharacterClass.barbarian, CharacterClass.druid, CharacterClass.ranger, CharacterClass.monk],
 };
 
-/// Placeholder weights — will be updated when new map system arrives.
-const Map<int, Map<String, int>> mapThemeWeights = {
-  1: {'forest': 40, 'martial': 30, 'wild': 20, 'holy': 10},
-  2: {'forest': 30, 'arcane': 25, 'martial': 25, 'wild': 20},
-  3: {'martial': 30, 'arcane': 25, 'wild': 25, 'holy': 20},
-  4: {'arcane': 30, 'dark': 25, 'martial': 25, 'holy': 20},
-  5: {'dark': 30, 'wild': 25, 'arcane': 25, 'martial': 20},
-  6: {'dark': 30, 'martial': 25, 'holy': 25, 'arcane': 20},
-  7: {'dark': 35, 'arcane': 25, 'holy': 25, 'martial': 15},
-  8: {'dark': 40, 'holy': 25, 'arcane': 20, 'martial': 15},
-};
 
 const List<GameEvent> gameEvents = [
   // ── forest ───────────────────────────────────────────────────
@@ -390,25 +379,10 @@ const List<GameEvent> gameEvents = [
   ),
 ];
 
-/// Selects a random event themed for the given map number.
-GameEvent selectEventForMap(int mapNumber, [Random? rng]) {
+/// Selects a random event matching the given theme.
+GameEvent selectEventForTheme(String theme, [Random? rng]) {
   rng ??= Random();
-  final weights = mapThemeWeights[mapNumber.clamp(1, 8)] ?? mapThemeWeights[1]!;
-
-  // Pick a theme based on weights
-  final totalWeight = weights.values.fold(0, (sum, w) => sum + w);
-  var roll = rng.nextInt(totalWeight);
-  String selectedTheme = weights.keys.first;
-  for (final entry in weights.entries) {
-    roll -= entry.value;
-    if (roll < 0) {
-      selectedTheme = entry.key;
-      break;
-    }
-  }
-
-  // Filter events by theme, pick one randomly
-  final themed = gameEvents.where((e) => e.theme == selectedTheme).toList();
+  final themed = gameEvents.where((e) => e.theme == theme).toList();
   if (themed.isEmpty) {
     return gameEvents[rng.nextInt(gameEvents.length)];
   }
