@@ -16,6 +16,15 @@ class StoryUnlockResult {
 
   /// True if this unlock triggers an art tier upgrade (chapters 4 and 8).
   bool get isArtUpgrade => chapter == 4 || chapter == 8;
+
+  /// LP reward for unlocking this chapter.
+  /// Base: 5 × chapter number. Milestone bonus: +10 at chapter 4, +15 at chapter 8.
+  int get lpReward {
+    final base = 5 * chapter;
+    if (chapter == 4) return base + 10;
+    if (chapter == 8) return base + 15;
+    return base;
+  }
 }
 
 /// Determines which class (if any) should get a story unlock from an event.

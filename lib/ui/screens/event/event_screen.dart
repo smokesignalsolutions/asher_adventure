@@ -31,6 +31,7 @@ class _EventScreenState extends ConsumerState<EventScreen> {
   bool _animationShowNew = false;
   StoryUnlockResult? _unlockResult;
   ClassStoryChapter? _unlockedChapter;
+  int _lpEarned = 0;
   final _focusNode = FocusNode();
 
   @override
@@ -176,8 +177,9 @@ class _EventScreenState extends ConsumerState<EventScreen> {
       return;
     }
 
-    // Unlock the chapter
+    // Unlock the chapter and award LP
     ref.read(playerProfileProvider.notifier).recordClassStoryProgress(result.className, result.chapter);
+    ref.read(playerProfileProvider.notifier).addLegacyPoints(result.lpReward);
 
     // Find the story content (with safety check)
     final chapter = classStories.cast<ClassStoryChapter?>().firstWhere(
@@ -193,6 +195,7 @@ class _EventScreenState extends ConsumerState<EventScreen> {
     setState(() {
       _unlockResult = result;
       _unlockedChapter = chapter;
+      _lpEarned = result.lpReward;
       _showExplorePrompt = false;
       _showStoryDialog = true;
     });
@@ -369,7 +372,23 @@ class _EventScreenState extends ConsumerState<EventScreen> {
                   style: theme.textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                  ),
+                  child: Text(
+                    '+$_lpEarned Legacy Points',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.amber,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 FilledButton(
                   onPressed: _dismissStoryDialog,
                   child: const Text('Continue'),
