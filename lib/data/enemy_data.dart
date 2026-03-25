@@ -255,3 +255,330 @@ List<EnemyTemplate> armySoldiers(int mapNumber) {
     ),
   ];
 }
+
+/// Helper to create a custom enemy scaled to 120% of tier average stats.
+EnemyTemplate _customEnemy(String name, String type, int tier,
+    List<AppliedEffect> specialEffects, String specialName, String specialDesc,
+    {AbilityTarget specialTarget = AbilityTarget.singleEnemy, int specialRefresh = 50}) {
+  final templates = enemiesByMap[tier] ?? enemiesByMap[1]!;
+  final avgHp = (templates.fold(0, (sum, t) => sum + t.hp) / templates.length * 1.2).round();
+  final avgAtk = (templates.fold(0, (sum, t) => sum + t.attack) / templates.length * 1.2).round();
+  final avgDef = (templates.fold(0, (sum, t) => sum + t.defense) / templates.length * 1.2).round();
+  final avgSpd = (templates.fold(0, (sum, t) => sum + t.speed) / templates.length * 1.2).round();
+  final avgMag = (templates.fold(0, (sum, t) => sum + t.magic) / templates.length * 1.2).round();
+  final avgXp = (templates.fold(0, (sum, t) => sum + t.xpReward) / templates.length * 1.15).round();
+  final avgGold = (templates.fold(0, (sum, t) => sum + t.goldReward) / templates.length * 1.15).round();
+  final specialDmg = (avgAtk * 0.55).round();
+
+  return EnemyTemplate(
+    name: name, type: type,
+    hp: avgHp, attack: avgAtk, defense: avgDef, speed: avgSpd, magic: avgMag,
+    xpReward: avgXp, goldReward: avgGold,
+    abilities: [
+      Ability(name: 'Attack', description: 'A basic attack.', damage: avgAtk,
+        refreshChance: 100, targetType: AbilityTarget.singleEnemy, unlockedAtLevel: 1, isBasicAttack: true),
+      Ability(name: specialName, description: specialDesc, damage: specialDmg,
+        refreshChance: specialRefresh, targetType: specialTarget, unlockedAtLevel: 1,
+        appliesStatusEffects: specialEffects),
+    ],
+  );
+}
+
+/// Custom map enemies: 2 per map definition.
+/// Key = map definition ID, Value = list of 2 factory functions (tier -> EnemyTemplate).
+typedef CustomEnemyFactory = EnemyTemplate Function(int tier);
+
+final Map<int, List<CustomEnemyFactory>> customEnemiesByMap = {
+  // === Natural/Overworld Maps ===
+  // 1: Forest
+  1: [
+    (tier) => _customEnemy('Thornbear', 'thornbear', tier,
+      [AppliedEffect(type: StatusEffectType.bleeding, duration: 3, magnitude: StatusDefaults.dotDamage(tier))],
+      'Thorn Maul', 'Bramble-covered claws rend flesh.'),
+    (tier) => _customEnemy('Woodland Stalker', 'woodland_stalker', tier,
+      [AppliedEffect(type: StatusEffectType.slowed, duration: 2, magnitude: 30)],
+      'Snare Shot', 'A well-aimed snare.'),
+  ],
+  // 2: Desert
+  2: [
+    (tier) => _customEnemy('Sand Wurm', 'sand_wurm', tier,
+      [AppliedEffect(type: StatusEffectType.blinded, duration: 2, magnitude: 40)],
+      'Sandblast', 'A blinding spray of sand.'),
+    (tier) => _customEnemy('Dust Wraith', 'dust_wraith', tier,
+      [AppliedEffect(type: StatusEffectType.burning, duration: 2, magnitude: StatusDefaults.dotDamage(tier))],
+      'Scorching Touch', 'Desert heat burns.'),
+  ],
+  // 3: Swamp
+  3: [
+    (tier) => _customEnemy('Bog Zombie', 'bog_zombie', tier,
+      [AppliedEffect(type: StatusEffectType.poisoned, duration: 3, magnitude: StatusDefaults.dotDamage(tier))],
+      'Toxic Grasp', 'Waterlogged claws drip poison.'),
+    (tier) => _customEnemy('Swamp Hag', 'swamp_hag', tier,
+      [AppliedEffect(type: StatusEffectType.cursed, duration: 3)],
+      'Hex', 'A twisted swamp curse.'),
+  ],
+  // 4: Tundra
+  4: [
+    (tier) => _customEnemy('Frost Stalker', 'frost_stalker', tier,
+      [AppliedEffect(type: StatusEffectType.frozen, duration: 1, magnitude: 30)],
+      'Flash Freeze', 'Ice-cold strike freezes.'),
+    (tier) => _customEnemy('Snow Wraith', 'snow_wraith', tier,
+      [AppliedEffect(type: StatusEffectType.slowed, duration: 3, magnitude: 30)],
+      'Chilling Wind', 'A bone-chilling gust.'),
+  ],
+  // 5: Volcano
+  5: [
+    (tier) => _customEnemy('Magma Golem', 'magma_golem', tier,
+      [AppliedEffect(type: StatusEffectType.burning, duration: 3, magnitude: StatusDefaults.dotDamage(tier))],
+      'Eruption', 'Molten rock erupts.'),
+    (tier) => _customEnemy('Ember Imp', 'ember_imp', tier,
+      [AppliedEffect(type: StatusEffectType.burning, duration: 2, magnitude: StatusDefaults.dotDamage(tier))],
+      'Flame Burst', 'Fire engulfs all.', specialTarget: AbilityTarget.allEnemies),
+  ],
+  // 6: Mountain Pass
+  6: [
+    (tier) => _customEnemy('Rock Troll', 'rock_troll', tier,
+      [AppliedEffect(type: StatusEffectType.stunned, duration: 1)],
+      'Boulder Slam', 'A crushing boulder strike.'),
+    (tier) => _customEnemy('Mountain Eagle', 'mountain_eagle', tier,
+      [AppliedEffect(type: StatusEffectType.bleeding, duration: 2, magnitude: StatusDefaults.dotDamage(tier))],
+      'Diving Talon', 'Razor talons from above.'),
+  ],
+  // 7: Coastal Cliffs
+  7: [
+    (tier) => _customEnemy('Sea Serpent', 'sea_serpent', tier,
+      [AppliedEffect(type: StatusEffectType.weakened, duration: 2, magnitude: 25)],
+      'Constrict', 'Coils tighten around you.'),
+    (tier) => _customEnemy('Siren', 'siren', tier,
+      [AppliedEffect(type: StatusEffectType.silenced, duration: 2)],
+      'Siren Song', 'Enchanted melody silences.'),
+  ],
+  // 8: Plains
+  8: [
+    (tier) => _customEnemy('War Centaur', 'war_centaur', tier,
+      [AppliedEffect(type: StatusEffectType.stunned, duration: 1)],
+      'Trample', 'Thundering hooves.'),
+    (tier) => _customEnemy('Prairie Stalker', 'prairie_stalker', tier,
+      [AppliedEffect(type: StatusEffectType.slowed, duration: 2, magnitude: 30)],
+      'Hamstring', 'Crippling bite to the legs.'),
+  ],
+  // 9: Deep Jungle
+  9: [
+    (tier) => _customEnemy('Venomspitter', 'venomspitter', tier,
+      [AppliedEffect(type: StatusEffectType.poisoned, duration: 3, magnitude: StatusDefaults.dotDamage(tier))],
+      'Venom Spray', 'Toxic spray from fangs.'),
+    (tier) => _customEnemy('Canopy Spider', 'canopy_spider', tier,
+      [AppliedEffect(type: StatusEffectType.weakened, duration: 2, magnitude: 25)],
+      'Web Shot', 'Sticky web restricts movement.'),
+  ],
+  // 10: Cursed Wasteland
+  10: [
+    (tier) => _customEnemy('Blight Walker', 'blight_walker', tier,
+      [AppliedEffect(type: StatusEffectType.cursed, duration: 3)],
+      'Corrupting Touch', 'Corruption spreads.'),
+    (tier) => _customEnemy('Ash Phantom', 'ash_phantom', tier,
+      [AppliedEffect(type: StatusEffectType.blinded, duration: 2, magnitude: 40)],
+      'Ashen Veil', 'Ash clouds obscure vision.'),
+  ],
+  // 21: Badlands
+  21: [
+    (tier) => _customEnemy('Dust Devil', 'dust_devil', tier,
+      [AppliedEffect(type: StatusEffectType.blinded, duration: 2, magnitude: 40)],
+      'Sand Cyclone', 'Whirling sand blinds.'),
+    (tier) => _customEnemy('Scorpion Brute', 'scorpion_brute', tier,
+      [AppliedEffect(type: StatusEffectType.poisoned, duration: 3, magnitude: StatusDefaults.dotDamage(tier))],
+      'Venomous Sting', 'Armored tail strikes.'),
+  ],
+  // 22: Mushroom Forest
+  22: [
+    (tier) => _customEnemy('Spore Beast', 'spore_beast', tier,
+      [AppliedEffect(type: StatusEffectType.poisoned, duration: 2, magnitude: StatusDefaults.dotDamage(tier))],
+      'Spore Cloud', 'Toxic spores fill the air.', specialTarget: AbilityTarget.allEnemies),
+    (tier) => _customEnemy('Myconid Guardian', 'myconid_guardian', tier,
+      [AppliedEffect(type: StatusEffectType.slowed, duration: 2, magnitude: 30)],
+      'Fungal Slam', 'Heavy fungal fists.'),
+  ],
+  // 23: Sunken Marsh
+  23: [
+    (tier) => _customEnemy('Marsh Lurker', 'marsh_lurker', tier,
+      [AppliedEffect(type: StatusEffectType.bleeding, duration: 3, magnitude: StatusDefaults.dotDamage(tier))],
+      'Death Roll', 'Crocodilian ambush.'),
+    (tier) => _customEnemy('Will-o-Wisp', 'will_o_wisp', tier,
+      [AppliedEffect(type: StatusEffectType.blinded, duration: 2, magnitude: 40)],
+      'Bewildering Glow', 'Deceptive light dazzles.'),
+  ],
+
+  // === Dungeon/Underground Maps ===
+  // 11: Cave System
+  11: [
+    (tier) => _customEnemy('Cave Troll', 'cave_troll', tier,
+      [AppliedEffect(type: StatusEffectType.weakened, duration: 2, magnitude: 25)],
+      'Crushing Grip', 'Blind but powerful grip.'),
+    (tier) => _customEnemy('Crystal Bat', 'crystal_bat', tier,
+      [AppliedEffect(type: StatusEffectType.silenced, duration: 2)],
+      'Sonic Screech', 'Razor-winged screech.'),
+  ],
+  // 12: Ancient Ruins
+  12: [
+    (tier) => _customEnemy('Animated Guardian', 'animated_guardian', tier,
+      [AppliedEffect(type: StatusEffectType.frozen, duration: 1, magnitude: 30)],
+      'Petrifying Strike', 'Stone fist freezes.'),
+    (tier) => _customEnemy('Rune Wraith', 'rune_wraith', tier,
+      [AppliedEffect(type: StatusEffectType.burning, duration: 2, magnitude: StatusDefaults.dotDamage(tier)),
+       AppliedEffect(type: StatusEffectType.silenced, duration: 1)],
+      'Rune Burn', 'Ancient runes sear flesh.'),
+  ],
+  // 13: Catacombs
+  13: [
+    (tier) => _customEnemy('Crypt Stalker', 'crypt_stalker', tier,
+      [AppliedEffect(type: StatusEffectType.cursed, duration: 2)],
+      'Gravetouched Claws', 'Death-tainted claws.'),
+    (tier) => _customEnemy('Bone Colossus', 'bone_colossus', tier,
+      [AppliedEffect(type: StatusEffectType.bleeding, duration: 3, magnitude: StatusDefaults.dotDamage(tier))],
+      'Bone Shrapnel', 'Exploding bone fragments.'),
+  ],
+  // 14: Underground Lake
+  14: [
+    (tier) => _customEnemy('Deep Angler', 'deep_angler', tier,
+      [AppliedEffect(type: StatusEffectType.stunned, duration: 1)],
+      'Lure Snap', 'Bioluminescent ambush.'),
+    (tier) => _customEnemy('Lake Serpent', 'lake_serpent', tier,
+      [AppliedEffect(type: StatusEffectType.weakened, duration: 3, magnitude: 25)],
+      'Tidal Coil', 'Aquatic constriction.'),
+  ],
+  // 15: Goblin Warren
+  15: [
+    (tier) => _customEnemy('Goblin Alchemist', 'goblin_alchemist', tier,
+      [AppliedEffect(type: StatusEffectType.exposed, duration: 3, magnitude: 30)],
+      'Acid Flask', 'Corrosive potion.'),
+    (tier) => _customEnemy('Goblin Trapper', 'goblin_trapper', tier,
+      [AppliedEffect(type: StatusEffectType.slowed, duration: 2, magnitude: 30),
+       AppliedEffect(type: StatusEffectType.weakened, duration: 1, magnitude: 25)],
+      'Net Toss', 'Tangled in a net.'),
+  ],
+  // 24: Crystal Caverns
+  24: [
+    (tier) => _customEnemy('Crystal Golem', 'crystal_golem', tier,
+      [AppliedEffect(type: StatusEffectType.blinded, duration: 2, magnitude: 40)],
+      'Prism Blast', 'Blinding light refracts.'),
+    (tier) => _customEnemy('Gem Viper', 'gem_viper', tier,
+      [AppliedEffect(type: StatusEffectType.bleeding, duration: 2, magnitude: StatusDefaults.dotDamage(tier)),
+       AppliedEffect(type: StatusEffectType.exposed, duration: 1, magnitude: 30)],
+      'Crystal Fang', 'Crystalline fangs pierce.'),
+  ],
+  // 25: Haunted Graveyard
+  25: [
+    (tier) => _customEnemy('Grave Knight', 'grave_knight', tier,
+      [AppliedEffect(type: StatusEffectType.cursed, duration: 3)],
+      'Spectral Cleave', 'Ghostly blade curses.'),
+    (tier) => _customEnemy('Banshee', 'banshee', tier,
+      [AppliedEffect(type: StatusEffectType.silenced, duration: 2),
+       AppliedEffect(type: StatusEffectType.weakened, duration: 1, magnitude: 25)],
+      'Death Wail', 'Wailing spirit screams.'),
+  ],
+  // 26: Abandoned Mine
+  26: [
+    (tier) => _customEnemy('Mine Creeper', 'mine_creeper', tier,
+      [AppliedEffect(type: StatusEffectType.exposed, duration: 3, magnitude: 30)],
+      'Acid Spit', 'Corrosive insect spit.'),
+    (tier) => _customEnemy('Dynamite Goblin', 'dynamite_goblin', tier,
+      [AppliedEffect(type: StatusEffectType.stunned, duration: 1),
+       AppliedEffect(type: StatusEffectType.burning, duration: 1, magnitude: StatusDefaults.dotDamage(tier))],
+      'Blast Charge', 'Explosive blast.'),
+  ],
+
+  // === Magical/Special Maps ===
+  // 16: Shadow Realm
+  16: [
+    (tier) => _customEnemy('Void Stalker', 'void_stalker', tier,
+      [AppliedEffect(type: StatusEffectType.cursed, duration: 3),
+       AppliedEffect(type: StatusEffectType.weakened, duration: 1, magnitude: 25)],
+      'Void Touch', 'Darkness consumes.'),
+    (tier) => _customEnemy('Shadow Devourer', 'shadow_devourer', tier,
+      [AppliedEffect(type: StatusEffectType.blinded, duration: 3, magnitude: 40)],
+      'Engulfing Dark', 'Light is devoured.'),
+  ],
+  // 17: Enchanted Grove
+  17: [
+    (tier) => _customEnemy('Treant Sentinel', 'treant_sentinel', tier,
+      [AppliedEffect(type: StatusEffectType.stunned, duration: 1),
+       AppliedEffect(type: StatusEffectType.exposed, duration: 2, magnitude: 30)],
+      'Root Bind', 'Living roots entangle.'),
+    (tier) => _customEnemy('Pixie Swarm', 'pixie_swarm', tier,
+      [AppliedEffect(type: StatusEffectType.silenced, duration: 2)],
+      'Fairy Dust', 'Mischievous fae magic.'),
+  ],
+  // 18: Demon Fortress
+  18: [
+    (tier) => _customEnemy('Hellhound', 'hellhound', tier,
+      [AppliedEffect(type: StatusEffectType.burning, duration: 3, magnitude: StatusDefaults.dotDamage(tier))],
+      'Infernal Bite', 'Fire-breathing maw.'),
+    (tier) => _customEnemy('Demon Sentry', 'demon_sentry', tier,
+      [AppliedEffect(type: StatusEffectType.exposed, duration: 2, magnitude: 30),
+       AppliedEffect(type: StatusEffectType.bleeding, duration: 2, magnitude: StatusDefaults.dotDamage(tier))],
+      'Abyssal Strike', 'Demonic blade rends.'),
+  ],
+  // 19: Sky Islands
+  19: [
+    (tier) => _customEnemy('Storm Hawk', 'storm_hawk', tier,
+      [AppliedEffect(type: StatusEffectType.stunned, duration: 1)],
+      'Lightning Dive', 'Lightning-charged strike.'),
+    (tier) => _customEnemy('Cloud Elemental', 'cloud_elemental', tier,
+      [AppliedEffect(type: StatusEffectType.slowed, duration: 2, magnitude: 30),
+       AppliedEffect(type: StatusEffectType.burning, duration: 1, magnitude: StatusDefaults.dotDamage(tier))],
+      'Static Shock', 'Living storm crackles.'),
+  ],
+  // 20: The Void
+  20: [
+    (tier) => _customEnemy('Void Reaver', 'void_reaver', tier,
+      [AppliedEffect(type: StatusEffectType.exposed, duration: 2, magnitude: 30),
+       AppliedEffect(type: StatusEffectType.cursed, duration: 2)],
+      'Reality Tear', 'Tears the fabric of reality.'),
+    (tier) => _customEnemy('Entropy Shade', 'entropy_shade', tier,
+      [AppliedEffect(type: StatusEffectType.weakened, duration: 2, magnitude: 25),
+       AppliedEffect(type: StatusEffectType.poisoned, duration: 2, magnitude: StatusDefaults.dotDamage(tier))],
+      'Entropic Decay', 'Entropy incarnate.'),
+  ],
+  // 27: Pirate Cove
+  27: [
+    (tier) => _customEnemy('Cursed Buccaneer', 'cursed_buccaneer', tier,
+      [AppliedEffect(type: StatusEffectType.cursed, duration: 2),
+       AppliedEffect(type: StatusEffectType.bleeding, duration: 2, magnitude: StatusDefaults.dotDamage(tier))],
+      'Cursed Cutlass', 'Undead pirate slashes.'),
+    (tier) => _customEnemy('Kraken Spawn', 'kraken_spawn', tier,
+      [AppliedEffect(type: StatusEffectType.weakened, duration: 2, magnitude: 25),
+       AppliedEffect(type: StatusEffectType.slowed, duration: 1, magnitude: 30)],
+      'Tentacle Lash', 'Tentacles constrict.'),
+  ],
+  // 28: Arcane Tower
+  28: [
+    (tier) => _customEnemy('Arcane Sentinel', 'arcane_sentinel', tier,
+      [AppliedEffect(type: StatusEffectType.silenced, duration: 3)],
+      'Mana Burn', 'Magical constructs drain mana.'),
+    (tier) => _customEnemy('Spell Wraith', 'spell_wraith', tier,
+      [AppliedEffect(type: StatusEffectType.burning, duration: 2, magnitude: StatusDefaults.dotDamage(tier)),
+       AppliedEffect(type: StatusEffectType.exposed, duration: 1, magnitude: 30)],
+      'Arcane Overload', 'Rogue magical energy.'),
+  ],
+  // 29: Gladiator Arena
+  29: [
+    (tier) => _customEnemy('Arena Champion', 'arena_champion', tier,
+      [AppliedEffect(type: StatusEffectType.stunned, duration: 1),
+       AppliedEffect(type: StatusEffectType.exposed, duration: 1, magnitude: 30)],
+      'Shield Bash', 'Veteran gladiator strikes.'),
+    (tier) => _customEnemy('Beast Master', 'beast_master', tier,
+      [AppliedEffect(type: StatusEffectType.bleeding, duration: 2, magnitude: StatusDefaults.dotDamage(tier)),
+       AppliedEffect(type: StatusEffectType.slowed, duration: 2, magnitude: 30)],
+      'Command Attack', 'Trained beasts attack.'),
+  ],
+  // 30: Frozen Citadel
+  30: [
+    (tier) => _customEnemy('Frost Knight', 'frost_knight', tier,
+      [AppliedEffect(type: StatusEffectType.frozen, duration: 1, magnitude: 30),
+       AppliedEffect(type: StatusEffectType.slowed, duration: 1, magnitude: 30)],
+      'Glacial Strike', 'Ice-armored blow.'),
+    (tier) => _customEnemy('Ice Wraith', 'ice_wraith', tier,
+      [AppliedEffect(type: StatusEffectType.frozen, duration: 1, magnitude: 30)],
+      'Frozen Grasp', 'Freezing spirit grips.'),
+  ],
+};

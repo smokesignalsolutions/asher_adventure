@@ -215,14 +215,21 @@ class GameStateNotifier extends StateNotifier<GameState?> {
   List<Enemy> generateEnemies() {
     if (state == null) return [];
     final mapNum = state!.currentMapNumber;
+    final mapDefId = state!.currentMapDefinitionId;
     final templates = enemiesByMap[mapNum] ?? enemiesByMap[1]!;
-    // Base count from party size + 1-3 extra
+    final customFactories = customEnemiesByMap[mapDefId];
+
     final partySize = state!.party.where((c) => c.isAlive).length;
     final baseMax = partySize <= 1 ? 1 : partySize <= 2 ? 2 : 3;
-    final extra = 1 + _random.nextInt(3); // 1-3 extra
+    final extra = 1 + _random.nextInt(3);
     final count = (1 + _random.nextInt(baseMax)) + extra;
 
     return List.generate(count, (_) {
+      // 25% chance to spawn a custom map enemy if available
+      if (customFactories != null && _random.nextInt(100) < 25) {
+        final factory = customFactories[_random.nextInt(customFactories.length)];
+        return _enemyFromTemplate(factory(mapNum));
+      }
       final template = templates[_random.nextInt(templates.length)];
       return _enemyFromTemplate(template);
     });
