@@ -108,11 +108,18 @@ class CharacterDetailCard extends StatelessWidget {
             );
           }
           return Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: Text(
-              '$label: \u2014',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.red.shade400, width: 1.5),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$label: Empty',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.red.shade300,
+                ),
               ),
             ),
           );
