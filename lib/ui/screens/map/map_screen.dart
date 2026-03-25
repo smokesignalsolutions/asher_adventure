@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/class_data.dart';
 import '../../../data/map_backgrounds.dart';
+import '../../../data/map_data.dart';
 import '../../../data/mutator_data.dart';
 import '../../../models/enums.dart';
 import '../../../models/map_node.dart';
@@ -83,7 +84,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Map ${gameState.currentMapNumber} of 8'),
+        title: Text('Map ${gameState.currentMapNumber} — ${getMapDefinition(gameState.currentMapDefinitionId).name}'),
         actions: [
           IconButton(
             icon: const Icon(Icons.flag),
@@ -204,7 +205,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 final currentNode = map.currentNode;
                 const nodeRadius = 22.0;
 
-                final bgPath = mapBackground(gameState.currentMapNumber);
+                final bgPath = mapBackground(gameState.currentMapDefinitionId);
 
                 return ClipRect(
                   child: Stack(

@@ -119,7 +119,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     final gameState = ref.read(gameStateProvider);
     if (gameState == null) return;
 
-    _backgroundPath = combatBackground(gameState.currentMapNumber);
+    _backgroundPath = combatBackground(gameState.currentMapDefinitionId);
     _enemyDamageMultiplier = getMutatorEffect(
       gameState.activeMutator,
       'enemy_damage',
