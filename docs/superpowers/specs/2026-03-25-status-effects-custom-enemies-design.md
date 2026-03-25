@@ -13,17 +13,18 @@ New enum `StatusEffectType` and class `StatusEffect`:
 
 ```dart
 enum StatusEffectType {
-  weakened,   // Deal reduced damage
-  exposed,    // Reduced defense
-  slowed,     // Reduced speed
-  stunned,    // Lose next turn
-  blinded,    // % chance attacks miss
-  poisoned,   // Damage each turn
-  burning,    // Damage each turn (higher, shorter)
-  bleeding,   // Damage each turn
-  silenced,   // Only basic attack available
-  frozen,     // Stunned + next hit deals bonus damage
-  cursed,     // Healing received halved
+  weakened,    // Deal reduced damage
+  exposed,     // Reduced defense
+  vulnerable,  // Takes bonus damage from all sources (legacy appliesVulnerability)
+  slowed,      // Reduced speed
+  stunned,     // Lose next turn
+  blinded,     // % chance attacks miss
+  poisoned,    // Damage each turn
+  burning,     // Damage each turn (higher, shorter)
+  bleeding,    // Damage each turn
+  silenced,    // Only basic attack available
+  frozen,      // Stunned + next hit deals bonus damage
+  cursed,      // Healing received halved
 }
 
 class StatusEffect {
@@ -37,38 +38,81 @@ class StatusEffect {
 ### Effect Categories & Behavior
 
 **Offensive Debuffs:**
-| Type | Effect | Magnitude meaning |
-|------|--------|-------------------|
-| weakened | Target deals reduced damage | % damage reduction (e.g., 75 = deals 25% damage) |
-| exposed | Target has reduced defense | % defense reduction |
-| slowed | Target has reduced speed | % speed reduction |
+| Type | Effect | Magnitude meaning | Default magnitude |
+|------|--------|-------------------|-------------------|
+| weakened | Target deals reduced damage | % damage reduction (e.g., 25 = deals 75% damage) | 25% |
+| exposed | Target has reduced defense | % defense reduction | 30% |
+| vulnerable | Target takes bonus damage from all sources | Bonus damage % (random roll 5-magnitude%) | 15% |
+| slowed | Target has reduced speed | % speed reduction | 30% |
 
 **Damage Over Time (DoTs):**
-| Type | Effect | Magnitude meaning |
-|------|--------|-------------------|
-| poisoned | Take damage at start of turn | Flat damage per tick |
-| burning | Take damage at start of turn | Flat damage per tick |
-| bleeding | Take damage at start of turn | Flat damage per tick |
+| Type | Effect | Magnitude meaning | Default magnitude |
+|------|--------|-------------------|-------------------|
+| poisoned | Take damage at start of turn | Flat damage per tick | Scales with tier (see below) |
+| burning | Take damage at start of turn | Flat damage per tick | Scales with tier (see below) |
+| bleeding | Take damage at start of turn | Flat damage per tick | Scales with tier (see below) |
+
+DoT default damage by tier: `tier * 3 + 2` (T1=5, T2=8, T3=11, T4=14, T5=17, T6=20, T7=23, T8=26).
 
 **Control:**
-| Type | Effect | Magnitude meaning |
-|------|--------|-------------------|
-| stunned | Skip next turn | N/A (binary) |
-| blinded | Attacks have % chance to miss | Miss chance % |
-| silenced | Only basic attack available | N/A (binary) |
-| frozen | Stunned + next hit deals bonus damage | Bonus damage % on next hit |
-| cursed | Healing received halved | N/A (binary) |
+| Type | Effect | Magnitude meaning | Default magnitude |
+|------|--------|-------------------|-------------------|
+| stunned | Skip next turn | N/A (binary) | N/A |
+| blinded | Attacks have % chance to miss | Miss chance % | 40% |
+| silenced | Only basic attack available | N/A (binary) | N/A |
+| frozen | Stunned + next hit deals bonus damage | Bonus damage % on next hit | 30% |
+| cursed | Healing received halved | N/A (binary) | N/A |
 
-### Processing Order (per combatant turn start)
+When an ability lists a status effect without an explicit magnitude, use the default magnitude for that type.
 
-1. Tick DoTs (poison, burning, bleeding) — apply damage, decrement duration
-2. Check stunned/frozen — if active, skip turn, decrement duration
-3. Apply stat debuffs (weakened, exposed, slowed) via effective stat getters
-4. Check silenced — filter available abilities to basic attacks only
-5. On attack: check blinded — roll miss chance before damage
-6. On hit: check frozen on target — if frozen, bonus damage, remove frozen
-7. On heal received: check cursed — halve healing
-8. End of turn: remove effects with duration <= 0
+### Stacking Rules
+
+- **DoTs stack independently** — a target can have multiple poison instances ticking at once, each with its own damage and duration
+- **Control effects refresh** — reapplying stunned/frozen/silenced/blinded resets duration to the new application's value (latest wins)
+- **Stat debuffs (weakened, exposed, slowed) take strongest** — if a target already has weakened 25% and gets weakened 50%, use 50% and refresh duration. If the new application is weaker, just refresh the duration
+- **Vulnerable stacks** — multiple vulnerable applications increase the magnitude (capped at 30%)
+- **Cursed refreshes** — reapplying cursed resets duration
+
+### Boss Resistance
+
+Bosses have reduced status effect durations: all effects applied to bosses have their duration reduced by 1 (minimum 1). This prevents bosses from being stun-locked or permanently debilitated.
+
+### Processing Order (unified — single source of truth)
+
+**Turn start:**
+1. Tick DoTs (poison, burning, bleeding) — apply damage, decrement DoT durations, remove expired DoTs
+2. Check stunned/frozen — if active, skip turn, decrement stun/frozen duration, remove if expired, return (skip steps 3-5)
+
+**Action phase** (only reached if not stunned/frozen):
+3. Check silenced — filter available abilities to basic attacks only
+4. Choose ability (player picks or AI selects)
+5. Execute ability (see processAbilityHit / processHeal below)
+
+**End of turn:**
+6. Decrement durations of all remaining non-DoT effects (debuffs, control), remove expired ones
+
+**On ability hit (processAbilityHit):**
+1. If attacker has blinded — roll miss chance. If miss → log "{name}'s attack misses!", return
+2. If target has frozen — apply bonus damage (magnitude %), remove frozen from target
+3. If target has vulnerable — roll bonus damage (5% to magnitude%)
+4. Calculate damage using target.effectiveDefense (factors in exposed), attacker effective stats (factors in weakened)
+5. Apply damage (shield absorbs first, then HP)
+6. For each `appliesStatusEffects` on ability → roll chance%, if success → target.addStatusEffect()
+7. Log status application: "{target} is {effect}!" for each applied effect
+
+**On heal (processHeal):**
+1. If target has cursed — halve the heal amount
+2. Apply healing
+
+### Combat Log Messages
+
+Status effects generate log messages at key moments:
+- **Applied:** "{Target} is poisoned for 3 turns!"
+- **DoT tick:** "Poison deals 11 damage to {Target}!"
+- **Stun skip:** "{Target} is stunned and can't act!"
+- **Miss (blinded):** "{Attacker}'s attack misses!"
+- **Expired:** "{Target} is no longer poisoned."
+- **Frozen shatter:** "{Target} takes bonus damage from being frozen!"
 
 ### Ability Integration
 
@@ -94,28 +138,29 @@ Each effect rolls independently on hit. Example: Gore Charge has `[{stunned, 1, 
 
 ### Character (`lib/models/character.dart`)
 
-**Remove:**
-- `combatAttackMultiplier`
-- `combatDefenseMultiplier`
-- `combatSpeedMultiplier`
-- `combatMagicMultiplier`
-- `combatDefenseBonus`
+**Keep as-is (for player buffs and map modifiers):**
+- `combatAttackMultiplier` — used by player buff abilities (attackBuffPercent) and map stat modifiers
+- `combatDefenseMultiplier` — used by player buff abilities (defenseBuffPercent) and map stat modifiers
+- `combatSpeedMultiplier` — used by map stat modifiers
+- `combatMagicMultiplier` — used by map stat modifiers
+- `combatDefenseBonus` — used by grantCasterDefensePercent
+- `shieldHp`, `isFrontLine`, `activeSummons`, `skeletonCount`, `lastAttackWasPhysical` (class mechanic fields)
 
 **Add:**
 - `List<StatusEffect> statusEffects`
-- Getter `effectiveAttack` — base attack modified by weakened effects
-- Getter `effectiveDefense` — base defense modified by exposed effects
-- Getter `effectiveSpeed` — base speed modified by slowed effects
+- Getter `effectiveAttack` — base attack × combatAttackMultiplier, then reduced by weakened effects
+- Getter `effectiveDefense` — base defense × combatDefenseMultiplier + combatDefenseBonus, then reduced by exposed effects
+- Getter `effectiveSpeed` — base speed × combatSpeedMultiplier, then reduced by slowed effects
 - Getter `isStunned` — checks for stunned/frozen effects
 - Getter `isSilenced` — checks for silenced effect
-- Getter `isBlinded` — checks for blinded effect, returns miss chance
+- Getter `isBlinded` — checks for blinded effect, returns miss chance %
 - Getter `isCursed` — checks for cursed effect
+- Getter `isVulnerable` — checks for vulnerable effect, returns magnitude
 - Getter `activeStatusLabels` — returns list of display strings for UI
-- Helper `addStatusEffect(StatusEffect)` — adds to list (stacks or refreshes duration)
+- Helper `addStatusEffect(StatusEffect)` — adds to list following stacking rules
 - Helper `removeExpiredEffects()`
 - Helper `tickDoTs()` — returns total DoT damage this turn
-
-**Keep as-is:** `shieldHp`, `isFrontLine`, `activeSummons`, `skeletonCount`, `lastAttackWasPhysical` (these are class mechanic fields, not status effects)
+- Helper `clearStatusEffects()` — called at combat init to reset between fights
 
 ### Enemy (`lib/models/enemy.dart`)
 
@@ -133,12 +178,20 @@ Each effect rolls independently on hit. Example: Gore Charge has `[{stunned, 1, 
 
 ### Existing Player Abilities Migration
 
-All existing player abilities that use inline debuff fields get migrated to `appliesStatusEffects`:
+All existing player abilities that apply debuffs to enemies get migrated to `appliesStatusEffects`. Player buff abilities (`attackBuffPercent`, `defenseBuffPercent`, `grantCasterDefensePercent`) remain unchanged — they continue to modify the Character's combat multiplier fields.
+
+**Debuff field migration (remove old fields from Ability after migration):**
 - `stunChance` → `appliesStatusEffects: [{stunned, 1, 0, stunChance%}]`
-- `appliesVulnerability` → `appliesStatusEffects: [{exposed, -1, 10, 100%}]`
+- `appliesVulnerability` → `appliesStatusEffects: [{vulnerable, -1, 15, 100%}]`
 - `enemyAttackDebuffPercent` → `appliesStatusEffects: [{weakened, -1, percent, 100%}]`
 - `enemyDefenseDebuffPercent` → `appliesStatusEffects: [{exposed, -1, percent, 100%}]`
 - `tempEnemyAttackDebuffPercent` + `debuffDuration` → `appliesStatusEffects: [{weakened, duration, percent, 100%}]`
+
+**Ability fields to remove after migration:**
+- `stunChance`, `appliesVulnerability`, `enemyAttackDebuffPercent`, `enemyDefenseDebuffPercent`, `tempEnemyAttackDebuffPercent`, `debuffDuration`
+
+**Ability fields to keep (player buff mechanics):**
+- `attackBuffPercent`, `defenseBuffPercent`, `grantCasterDefensePercent`, `lifeDrain`, `darkPact`, `healPercentMaxHp`, `healScalesWithDefense`, `summonId`, `isPhysicalAttack`, `rogueDualStrike`, `chaotic`, `hitCount`, `minTargets`, `maxTargets`
 
 ---
 
@@ -146,30 +199,21 @@ All existing player abilities that use inline debuff fields get migrated to `app
 
 ### Unified Turn Processing
 
-Replace all inline status effect logic with centralized processing:
+Replace all inline status effect logic (isStunned checks, tempAttackMultiplier ticking, isVulnerable bonus) with the unified processing order defined in Section 1. The processing order in Section 1 is the single source of truth — do not duplicate it here.
 
-```
-processTurnStart(combatant):
-  1. tickDoTs() — apply poison/burning/bleeding damage
-  2. if stunned or frozen → skip turn, decrement, return
-  3. decrement all effect durations
-  4. removeExpiredEffects()
+Key changes to combat_service.dart:
+- Remove all direct reads of `enemy.isStunned`, `enemy.isVulnerable`, `enemy.tempAttackMultiplier`, `enemy.tempAttackDebuffTurns`
+- Replace with status effect getters and `tickDoTs()` / `removeExpiredEffects()` calls
+- Damage formula uses `target.effectiveDefense` and `attacker.effectiveAttack` (which factor in status effects on top of existing combat multipliers)
+- All player ability debuff application routes through `appliesStatusEffects` instead of inline field mutation
 
-processAbilityHit(ability, target):
-  1. if attacker blinded → roll miss chance, if miss → log miss, return
-  2. if target frozen → apply bonus damage, remove frozen
-  3. calculate damage using target.effectiveDefense, attacker.effectiveAttack
-  4. apply damage (shield absorb first, then HP)
-  5. for each appliesStatusEffects on ability → roll chance, if success → target.addStatusEffect()
+### Template Factory Fix
 
-processHeal(target, amount):
-  1. if target cursed → amount = amount / 2
-  2. apply healing
-```
+`_enemyFromTemplate` in `game_state_provider.dart` currently cherry-picks ability fields. It must be updated to copy the full `Ability` object (including the new `appliesStatusEffects` list) — either by passing the Ability directly or using a `copyWith` pattern. Without this fix, all enemy special abilities lose their status effects at runtime.
 
 ### Stat Computation
 
-All damage/defense calculations use the `effective*` getters which factor in active status effects. This replaces the old inline multiplier approach.
+All damage/defense calculations use the `effective*` getters which factor in active status effects. For Characters, the effective stat computation layers: base stat → combat multiplier (buffs/map modifiers) → status effect reduction (debuffs). For Enemies, the effective stat computation is: base stat → status effect reduction only (enemies don't have buff multipliers).
 
 ---
 
@@ -197,7 +241,7 @@ When building a combat encounter for a map node, custom map enemies are added to
 
 ### Full Custom Enemy Roster (60 enemies)
 
-Each has a basic attack + one special ability with status effects.
+Each has a basic attack (singleEnemy) + one special ability with status effects. All special abilities are **singleEnemy** target type unless explicitly marked as **(AOE)**. Special abilities have 50% refresh chance unless otherwise noted. Map IDs are non-sequential because they follow the category-based scheme from map_data.dart.
 
 #### Natural/Overworld Maps
 
@@ -381,7 +425,7 @@ Every existing enemy gets a new special ability (refresh 40-60%) that applies st
 
 ### Army Soldiers
 - **Army Fighter** — *Shield Bash* gains: stunned 1 turn
-- **Army Cleric** — *Holy Smite* (new 3rd ability, 40% refresh) → silenced 2 turns
+- **Army Cleric** — *Holy Smite* (new 3rd ability, 40% refresh, damage: `4 + s * 3`, singleEnemy) → silenced 2 turns
 - **Army Wizard** — *Arcane Blast* gains: burning 1 turn
 
 ---
