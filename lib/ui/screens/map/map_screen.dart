@@ -109,6 +109,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ),
       body: Column(
         children: [
+          // Map modifiers for party classes
+          _buildMapModifiers(gameState, theme),
           // Compact party HP bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -292,6 +294,57 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       column += 1.0;
     }
     return column;
+  }
+
+  Widget _buildMapModifiers(GameState gameState, ThemeData theme) {
+    final mapDef = getMapDefinition(gameState.currentMapDefinitionId);
+    final partyClasses = gameState.party.map((c) => c.characterClass).toSet();
+
+    // Filter modifiers to only party classes
+    final relevant = mapDef.classModifiers.entries
+        .where((e) => partyClasses.contains(e.key))
+        .toList();
+
+    if (relevant.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 2,
+        children: relevant.map((entry) {
+          final className = entry.key.name[0].toUpperCase() + entry.key.name.substring(1);
+          final mod = entry.value;
+          final parts = <String>[];
+          if (mod.atkPercent != 0) parts.add('ATK ${mod.atkPercent > 0 ? '+' : ''}${mod.atkPercent.round()}%');
+          if (mod.magPercent != 0) parts.add('MAG ${mod.magPercent > 0 ? '+' : ''}${mod.magPercent.round()}%');
+          if (mod.defPercent != 0) parts.add('DEF ${mod.defPercent > 0 ? '+' : ''}${mod.defPercent.round()}%');
+          if (mod.spdPercent != 0) parts.add('SPD ${mod.spdPercent > 0 ? '+' : ''}${mod.spdPercent.round()}%');
+
+          final hasBuffs = mod.atkPercent > 0 || mod.magPercent > 0 || mod.defPercent > 0 || mod.spdPercent > 0;
+          final hasDebuffs = mod.atkPercent < 0 || mod.magPercent < 0 || mod.defPercent < 0 || mod.spdPercent < 0;
+          final Color color;
+          if (hasBuffs && !hasDebuffs) {
+            color = Colors.green.shade300;
+          } else if (hasDebuffs && !hasBuffs) {
+            color = Colors.red.shade300;
+          } else {
+            color = Colors.amber.shade300;
+          }
+
+          return Text(
+            '$className: ${parts.join(', ')}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontSize: 10,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
   void _confirmEndRun() {
