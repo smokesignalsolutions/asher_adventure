@@ -6,6 +6,7 @@ import '../models/character.dart';
 import '../models/combat_state.dart';
 import '../models/enemy.dart';
 import '../models/enums.dart';
+import '../models/status_effect.dart';
 import '../models/summon_effect.dart';
 
 class CombatService {
@@ -30,6 +31,11 @@ class CombatService {
       char.lastAttackWasPhysical = null;
       char.isFrontLine = !magicDamageClasses.contains(char.characterClass);
       char.skeletonCount = 0;
+      char.clearStatusEffects();
+    }
+
+    for (final enemy in enemies) {
+      enemy.clearStatusEffects();
     }
 
     // Apply map-specific class modifiers
@@ -133,7 +139,8 @@ class CombatService {
     int attackStat,
     int abilityDamage,
     int targetDefense, {
-    bool targetVulnerable = false,
+    int vulnerableMagnitude = 0,
+    int frozenBonusDamage = 0,
     bool chaotic = false,
     double damageMultiplier = 1.0,
     int attackerSpeed = 0,
@@ -143,9 +150,13 @@ class CombatService {
         ? 0.75 + _random.nextDouble() * 0.50
         : 0.8 + _random.nextDouble() * 0.4;
     var result = max(1, (raw * variance).round());
-    if (targetVulnerable) {
-      final bonus = 1.05 + _random.nextDouble() * 0.10;
+    if (vulnerableMagnitude > 0) {
+      final rollMax = max(1, vulnerableMagnitude - 4);
+      final bonus = 1.0 + (5 + _random.nextInt(rollMax)) / 100;
       result = (result * bonus).round();
+    }
+    if (frozenBonusDamage > 0) {
+      result = (result * (1 + frozenBonusDamage / 100)).round();
     }
     result = (result * damageMultiplier).round();
     final isCrit = rollCrit(attackerSpeed);
@@ -195,7 +206,8 @@ class CombatService {
       offensiveStat,
       ability.damage,
       target.effectiveDefense,
-      targetVulnerable: target.isVulnerable,
+      vulnerableMagnitude: target.vulnerableMagnitude,
+      frozenBonusDamage: target.frozenBonusDamage,
       chaotic: true,
       attackerSpeed: attacker.totalSpeed,
     );
@@ -220,7 +232,8 @@ class CombatService {
       offensiveStat,
       ability.damage,
       pierceTarget.effectiveDefense,
-      targetVulnerable: pierceTarget.isVulnerable,
+      vulnerableMagnitude: pierceTarget.vulnerableMagnitude,
+      frozenBonusDamage: pierceTarget.frozenBonusDamage,
       attackerSpeed: attacker.totalSpeed,
     );
     pierceTarget.currentHp = max(0, pierceTarget.currentHp - dmg);
@@ -261,7 +274,8 @@ class CombatService {
       offensiveStat,
       ability.damage,
       secondStrikeTarget.effectiveDefense,
-      targetVulnerable: secondStrikeTarget.isVulnerable,
+      vulnerableMagnitude: secondStrikeTarget.vulnerableMagnitude,
+      frozenBonusDamage: secondStrikeTarget.frozenBonusDamage,
       attackerSpeed: attacker.totalSpeed,
     );
     secondStrikeTarget.currentHp = max(0, secondStrikeTarget.currentHp - dmg);
@@ -333,13 +347,15 @@ class CombatService {
 
       // Multi-hit: each hit rolls damage separately
       final hits = ability.hitCount;
+      final wasFrozen = enemyTarget.frozenBonusDamage;
       for (int hit = 0; hit < hits; hit++) {
         if (!enemyTarget.isAlive) break;
         final (damage, isCrit) = calculateDamage(
           offensiveStat,
           ability.damage,
           enemyTarget.effectiveDefense,
-          targetVulnerable: enemyTarget.isVulnerable,
+          vulnerableMagnitude: enemyTarget.vulnerableMagnitude,
+          frozenBonusDamage: enemyTarget.frozenBonusDamage,
           chaotic: ability.chaotic,
           damageMultiplier: chainCastMult,
           attackerSpeed: attacker.totalSpeed,
@@ -402,40 +418,79 @@ class CombatService {
         }
       }
 
-      // Debuffs apply once (not per hit)
-      if (ability.appliesVulnerability && !enemyTarget.isVulnerable) {
-        enemyTarget.isVulnerable = true;
-        logs.add('${enemyTarget.name} is weakened!');
+      if (wasFrozen > 0) {
+        enemyTarget.shatterFrozen();
+        logs.add('${enemyTarget.name} shatters free from being frozen!');
+      }
+
+      // Apply status effects from ability
+      if (enemyTarget.isAlive) {
+        final isBoss = enemyTarget.type == 'boss';
+        for (final applied in ability.appliesStatusEffects) {
+          if (_random.nextInt(100) < applied.chance) {
+            final duration = isBoss && applied.duration > 0
+                ? max(1, applied.duration - 1)
+                : applied.duration;
+            final effect = StatusEffect(
+              type: applied.type,
+              duration: duration,
+              magnitude: applied.magnitude,
+              sourceId: attacker.id,
+            );
+            enemyTarget.addStatusEffect(effect);
+            logs.add('${enemyTarget.name} is ${effect.displayName.toLowerCase()}!');
+          }
+        }
+      }
+
+      // Legacy debuff fields (bridge until class_data.dart is migrated)
+      final isBoss = enemyTarget.type == 'boss';
+      if (ability.appliesVulnerability && enemyTarget.vulnerableMagnitude == 0) {
+        enemyTarget.addStatusEffect(StatusEffect(
+          type: StatusEffectType.vulnerable,
+          duration: -1,
+          magnitude: StatusDefaults.vulnerablePercent,
+          sourceId: attacker.id,
+        ));
+        logs.add('${enemyTarget.name} is vulnerable!');
       }
       if (ability.enemyAttackDebuffPercent > 0) {
-        enemyTarget.attackMultiplier *=
-            (1 - ability.enemyAttackDebuffPercent / 100);
-        logs.add(
-          '${enemyTarget.name} attack reduced by ${ability.enemyAttackDebuffPercent}%!',
-        );
+        enemyTarget.addStatusEffect(StatusEffect(
+          type: StatusEffectType.weakened,
+          duration: -1,
+          magnitude: ability.enemyAttackDebuffPercent,
+          sourceId: attacker.id,
+        ));
+        logs.add('${enemyTarget.name} attack reduced by ${ability.enemyAttackDebuffPercent}%!');
       }
       if (ability.enemyDefenseDebuffPercent > 0) {
-        enemyTarget.defenseMultiplier *=
-            (1 - ability.enemyDefenseDebuffPercent / 100);
-        logs.add(
-          '${enemyTarget.name} defense reduced by ${ability.enemyDefenseDebuffPercent}%!',
-        );
+        enemyTarget.addStatusEffect(StatusEffect(
+          type: StatusEffectType.exposed,
+          duration: -1,
+          magnitude: ability.enemyDefenseDebuffPercent,
+          sourceId: attacker.id,
+        ));
+        logs.add('${enemyTarget.name} defense reduced by ${ability.enemyDefenseDebuffPercent}%!');
       }
-      if (ability.stunChance > 0 &&
-          enemyTarget.isAlive &&
-          !enemyTarget.isStunned) {
+      if (ability.stunChance > 0 && enemyTarget.isAlive && !enemyTarget.isStunned) {
         if (_random.nextInt(100) < ability.stunChance) {
-          enemyTarget.isStunned = true;
+          enemyTarget.addStatusEffect(StatusEffect(
+            type: StatusEffectType.stunned,
+            duration: 1,
+            sourceId: attacker.id,
+          ));
           logs.add('${enemyTarget.name} is stunned!');
         }
       }
       if (ability.tempEnemyAttackDebuffPercent > 0) {
-        enemyTarget.tempAttackMultiplier =
-            1 - ability.tempEnemyAttackDebuffPercent / 100;
-        enemyTarget.tempAttackDebuffTurns = ability.debuffDuration;
-        logs.add(
-          '${enemyTarget.name} attack reduced by ${ability.tempEnemyAttackDebuffPercent}% for ${ability.debuffDuration} turns!',
-        );
+        final dur = isBoss ? max(1, ability.debuffDuration - 1) : ability.debuffDuration;
+        enemyTarget.addStatusEffect(StatusEffect(
+          type: StatusEffectType.weakened,
+          duration: dur,
+          magnitude: ability.tempEnemyAttackDebuffPercent,
+          sourceId: attacker.id,
+        ));
+        logs.add('${enemyTarget.name} attack reduced by ${ability.tempEnemyAttackDebuffPercent}% for $dur turns!');
       }
       if (!enemyTarget.isAlive) {
         logs.add('${enemyTarget.name} is defeated!');
@@ -467,19 +522,24 @@ class CombatService {
           healingMultiplier: healingMultiplier,
           casterSpeed: attacker.totalSpeed,
         );
+        var finalHeal = healAmount;
+        if (charTarget.isCursed) {
+          finalHeal = (healAmount / 2).round();
+          logs.add('Curse halves the healing!');
+        }
         final hpBefore = charTarget.currentHp;
         charTarget.currentHp = min(
           charTarget.totalMaxHp,
-          charTarget.currentHp + healAmount,
+          charTarget.currentHp + finalHeal,
         );
         logs.add(
-          '${attacker.name} uses ${ability.name} on ${charTarget.name} for $healAmount healing!${healCrit ? ' CRIT!' : ''}',
+          '${attacker.name} uses ${ability.name} on ${charTarget.name} for $finalHeal healing!${healCrit ? ' CRIT!' : ''}',
         );
 
         // Cleric overheal → shield (excess becomes shield, max 50% of target maxHp)
         if (attacker.characterClass == CharacterClass.cleric) {
           final actualHealed = charTarget.currentHp - hpBefore;
-          final overheal = healAmount - actualHealed;
+          final overheal = finalHeal - actualHealed;
           if (overheal > 0) {
             final shieldCap = charTarget.totalMaxHp ~/ 2;
             final shieldGain = min(overheal, shieldCap - charTarget.shieldHp);
@@ -640,7 +700,7 @@ class CombatService {
           if (aliveEnemies.isNotEmpty) {
             final dmg = 2 + summoner.totalMagic ~/ 6;
             for (final e in aliveEnemies) {
-              e.attackMultiplier = max(0.5, e.attackMultiplier - 0.10);
+              e.enrageMultiplier = max(0.5, e.enrageMultiplier - 0.10);
               e.currentHp = max(0, e.currentHp - dmg);
             }
             final defeated = aliveEnemies.where((e) => !e.isAlive).toList();
@@ -692,20 +752,32 @@ class CombatService {
     List<Character> allies, {
     double enemyDamageMultiplier = 1.0,
   }) {
-    // Check stun
-    if (enemy.isStunned) {
-      enemy.isStunned = false;
-      return '${enemy.name} is stunned and loses their turn!';
+    // Collect DoT types BEFORE ticking
+    final dotTypes = enemy.statusEffects.where((e) => e.isDot).map((e) => e.type).toSet();
+    final dotDamage = enemy.tickDoTs();
+    final logs = <String>[];
+    if (dotDamage > 0) {
+      enemy.currentHp = max(0, enemy.currentHp - dotDamage);
+      for (final dt in dotTypes) {
+        final name = StatusEffect(type: dt, duration: 0).displayName;
+        logs.add('$name deals damage to ${enemy.name}!');
+      }
+      if (!enemy.isAlive) {
+        logs.add('${enemy.name} is defeated!');
+        return logs.join(' ');
+      }
     }
 
-    // Tick down temporary debuffs
-    final logs = <String>[];
-    if (enemy.tempAttackDebuffTurns > 0) {
-      enemy.tempAttackDebuffTurns--;
-      if (enemy.tempAttackDebuffTurns <= 0) {
-        enemy.tempAttackMultiplier = 1.0;
-        logs.add('${enemy.name}\'s attack returns to normal.');
+    // Check stun/frozen
+    if (enemy.isStunned) {
+      final wasFrozen = enemy.statusEffects.any((e) => e.type == StatusEffectType.frozen);
+      for (final e in enemy.statusEffects.where((e) =>
+          e.type == StatusEffectType.stunned || e.type == StatusEffectType.frozen)) {
+        if (!e.isPermanent) e.duration--;
       }
+      enemy.removeExpiredEffects();
+      logs.add('${enemy.name} is ${wasFrozen ? 'frozen' : 'stunned'} and loses their turn!');
+      return logs.join(' ');
     }
 
     final aliveAllies = allies.where((a) => a.isAlive).toList();
@@ -742,10 +814,13 @@ class CombatService {
           logs.add('A skeleton shields ${ally.name} from the blast and crumbles! (${ally.skeletonCount} remaining)');
           continue;
         }
+        final allyFrozenBonus = ally.frozenBonusDamage;
         var (damage, isCrit) = calculateDamage(
           enemy.effectiveAttack,
           ability.damage,
           ally.totalDefense,
+          vulnerableMagnitude: ally.vulnerableMagnitude,
+          frozenBonusDamage: allyFrozenBonus,
           damageMultiplier: enemyDamageMultiplier,
           attackerSpeed: enemy.speed,
         );
@@ -768,6 +843,24 @@ class CombatService {
         }
         ally.currentHp = max(0, ally.currentHp - damage);
         logs.add(log);
+        if (allyFrozenBonus > 0) {
+          ally.shatterFrozen();
+          logs.add('${ally.name} shatters free from being frozen!');
+        }
+
+        // Apply status effects from enemy AOE ability
+        for (final applied in ability.appliesStatusEffects) {
+          if (_random.nextInt(100) < applied.chance) {
+            final effect = StatusEffect(
+              type: applied.type,
+              duration: applied.duration,
+              magnitude: applied.magnitude,
+              sourceId: enemy.id,
+            );
+            ally.addStatusEffect(effect);
+            logs.add('${ally.name} is ${effect.displayName.toLowerCase()}!');
+          }
+        }
 
         // Thorns: reflect 15% damage back
         final allyOffhand = ally.equipment[EquipmentSlot.offhand];
@@ -819,10 +912,13 @@ class CombatService {
       return logs.join(' ');
     }
 
+    final targetFrozenBonus = target.frozenBonusDamage;
     var (damage, isCrit) = calculateDamage(
       enemy.effectiveAttack,
       ability.damage,
       target.totalDefense,
+      vulnerableMagnitude: target.vulnerableMagnitude,
+      frozenBonusDamage: targetFrozenBonus,
       damageMultiplier: enemyDamageMultiplier,
       attackerSpeed: enemy.speed,
     );
@@ -846,6 +942,24 @@ class CombatService {
     }
     target.currentHp = max(0, target.currentHp - damage);
     logs.add(log);
+    if (targetFrozenBonus > 0) {
+      target.shatterFrozen();
+      logs.add('${target.name} shatters free from being frozen!');
+    }
+
+    // Apply status effects from enemy ability to target
+    for (final applied in ability.appliesStatusEffects) {
+      if (_random.nextInt(100) < applied.chance) {
+        final effect = StatusEffect(
+          type: applied.type,
+          duration: applied.duration,
+          magnitude: applied.magnitude,
+          sourceId: enemy.id,
+        );
+        target.addStatusEffect(effect);
+        logs.add('${target.name} is ${effect.displayName.toLowerCase()}!');
+      }
+    }
 
     // Thorns: reflect 15% damage back
     final offhand = target.equipment[EquipmentSlot.offhand];
@@ -861,6 +975,71 @@ class CombatService {
     // Fighter counter-attack
     if (target.isAlive && enemy.isAlive)
       logs.addAll(_tryFighterCounter(target, enemy));
+
+    // End of turn: decrement effect durations, remove expired
+    enemy.decrementEffectDurations();
+    enemy.removeExpiredEffects();
     return logs.join(' ');
+  }
+
+  /// Process ally status effects at start of turn.
+  /// Returns (canAct, logs).
+  static (bool canAct, List<String> logs) processAllyTurnStart(Character ally) {
+    final logs = <String>[];
+
+    // Collect DoT types BEFORE ticking
+    final dotTypes = ally.statusEffects.where((e) => e.isDot).map((e) => e.type).toSet();
+    final dotDamage = ally.tickDoTs();
+    if (dotDamage > 0) {
+      var remaining = dotDamage;
+      if (ally.shieldHp > 0) {
+        final shieldAbsorb = min(remaining, ally.shieldHp);
+        ally.shieldHp -= shieldAbsorb;
+        remaining -= shieldAbsorb;
+      }
+      ally.currentHp = max(0, ally.currentHp - remaining);
+      for (final dt in dotTypes) {
+        final name = StatusEffect(type: dt, duration: 0).displayName;
+        logs.add('$name deals damage to ${ally.name}!');
+      }
+      if (!ally.isAlive) {
+        logs.add('${ally.name} falls!');
+        return (false, logs);
+      }
+    }
+
+    // Check stun/frozen
+    if (ally.isStunned) {
+      final wasFrozen = ally.statusEffects.any((e) => e.type == StatusEffectType.frozen);
+      for (final e in ally.statusEffects.where((e) =>
+          e.type == StatusEffectType.stunned || e.type == StatusEffectType.frozen)) {
+        if (!e.isPermanent) e.duration--;
+      }
+      ally.removeExpiredEffects();
+      logs.add('${ally.name} is ${wasFrozen ? 'frozen' : 'stunned'} and can\'t act!');
+      return (false, logs);
+    }
+
+    return (true, logs);
+  }
+
+  /// Process ally end-of-turn: decrement durations, remove expired
+  static void processAllyTurnEnd(Character ally) {
+    ally.decrementEffectDurations();
+    ally.removeExpiredEffects();
+  }
+
+  /// Get available abilities considering silenced status
+  static List<Ability> getAvailableAbilities(List<Ability> abilities, bool isSilenced) {
+    var available = abilities.where((a) => a.isAvailable).toList();
+    if (isSilenced) {
+      available = available.where((a) => a.isBasicAttack).toList();
+    }
+    return available;
+  }
+
+  /// Roll blinded miss check. Returns true if the attack misses.
+  static bool rollBlindedMiss(int missChance) {
+    return _random.nextInt(100) < missChance;
   }
 }
