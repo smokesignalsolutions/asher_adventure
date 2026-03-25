@@ -18,6 +18,10 @@ class GameState {
   Map<String, int> enemyKillCountsThisRun;
   String? activePerk;
   String? activeMutator;
+  List<int> mapPool; // 8 selected map definition IDs for this run
+
+  /// The map definition ID (1-30) for the current map slot.
+  int get currentMapDefinitionId => mapPool[currentMapNumber - 1];
 
   GameState({
     required this.party,
@@ -35,8 +39,10 @@ class GameState {
     Map<String, int>? enemyKillCountsThisRun,
     this.activePerk,
     this.activeMutator,
+    List<int>? mapPool,
   }) : uniqueEnemyTypesKilledThisRun = uniqueEnemyTypesKilledThisRun ?? {},
-       enemyKillCountsThisRun = enemyKillCountsThisRun ?? {};
+       enemyKillCountsThisRun = enemyKillCountsThisRun ?? {},
+       mapPool = mapPool ?? [1, 2, 3, 4, 5, 6, 7, 8];
 
   Map<String, dynamic> toJson() => {
     'party': party.map((c) => c.toJson()).toList(),
@@ -54,6 +60,7 @@ class GameState {
     'enemyKillCountsThisRun': enemyKillCountsThisRun,
     'activePerk': activePerk,
     'activeMutator': activeMutator,
+    'mapPool': mapPool,
   };
 
   factory GameState.fromJson(Map<String, dynamic> json) => GameState(
@@ -78,5 +85,6 @@ class GameState {
         : null,
     activePerk: json['activePerk'] as String?,
     activeMutator: json['activeMutator'] as String?,
+    mapPool: json['mapPool'] != null ? List<int>.from(json['mapPool']) : null,
   );
 }

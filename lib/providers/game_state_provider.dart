@@ -10,6 +10,7 @@ import '../models/character.dart';
 import '../models/enemy.dart';
 import '../models/enums.dart';
 import '../models/game_state.dart';
+import '../data/map_data.dart';
 import '../services/map_service.dart';
 import '../services/progression_service.dart';
 import '../models/player_profile.dart';
@@ -106,6 +107,8 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       }
     }
 
+    final mapPool = generateMapPool();
+
     final map = MapService.generateMap(1);
     map.armyColumn = armyStartColumn;
 
@@ -117,6 +120,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       difficulty: difficulty,
       activePerk: activePerk,
       activeMutator: activeMutator,
+      mapPool: mapPool,
     );
 
     // Scout from starting position (unless scouting is disabled by mutator)
@@ -142,6 +146,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
     enemyKillCountsThisRun: Map.from(state!.enemyKillCountsThisRun),
     activePerk: state!.activePerk,
     activeMutator: state!.activeMutator,
+    mapPool: List.from(state!.mapPool),
   );
 
   Future<void> moveToNode(String nodeId) async {
@@ -400,6 +405,7 @@ class GameStateNotifier extends StateNotifier<GameState?> {
       enemyKillCountsThisRun: state!.enemyKillCountsThisRun,
       activePerk: state!.activePerk,
       activeMutator: state!.activeMutator,
+      mapPool: state!.mapPool,
     );
 
     if (state!.activeMutator != 'fog_of_war') {
