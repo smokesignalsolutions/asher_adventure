@@ -52,7 +52,7 @@ class AudioService {
   factory AudioService() => _instance;
   AudioService._();
 
-  final _musicPlayer = AudioPlayer();
+  AudioPlayer _musicPlayer = AudioPlayer();
   final _sfxPlayer = AudioPlayer();
 
   MusicTrack? _currentTrack;
@@ -60,6 +60,9 @@ class AudioService {
   double _volume = 0.7;
   bool _muted = false;
   bool _initialized = false;
+  bool _crossfading = false;
+  static const _crossfadeDuration = Duration(milliseconds: 1200);
+  static const _crossfadeSteps = 20;
 
   double get volume => _volume;
   bool get isMuted => _muted;
@@ -80,19 +83,51 @@ class AudioService {
   Future<void> playMusic(MusicTrack track) async {
     if (track == _currentTrack) return;
     _currentTrack = track;
-
-    // Pick a random variant each time the track type changes
     _currentPath = track.assetPath;
 
-    await _musicPlayer.stop();
-    if (!_muted) {
-      await _musicPlayer.setSource(AssetSource(_currentPath!));
-      await _applyVolume();
-      await _musicPlayer.resume();
+    if (_muted) {
+      await _musicPlayer.stop();
+      return;
     }
+
+    // Crossfade: fade out old player, fade in new player
+    _crossfading = true;
+    final oldPlayer = _musicPlayer;
+    final newPlayer = AudioPlayer();
+    await newPlayer.setReleaseMode(ReleaseMode.loop);
+    await newPlayer.setVolume(0.0);
+    await newPlayer.setSource(AssetSource(_currentPath!));
+    await newPlayer.resume();
+
+    _musicPlayer = newPlayer;
+
+    final stepDelay = Duration(
+      milliseconds: _crossfadeDuration.inMilliseconds ~/ _crossfadeSteps,
+    );
+
+    for (int i = 1; i <= _crossfadeSteps; i++) {
+      await Future.delayed(stepDelay);
+      if (!_crossfading) break; // interrupted by another track change
+      final progress = i / _crossfadeSteps;
+      final oldVol = _volume * (1 - progress);
+      final newVol = _volume * progress;
+      try {
+        await oldPlayer.setVolume(oldVol.clamp(0.0, 1.0));
+      } catch (_) {} // old player may already be disposed
+      await newPlayer.setVolume(newVol.clamp(0.0, 1.0));
+    }
+
+    // Clean up old player
+    try {
+      await oldPlayer.stop();
+      await oldPlayer.dispose();
+    } catch (_) {}
+
+    _crossfading = false;
   }
 
   Future<void> stopMusic() async {
+    _crossfading = false;
     _currentTrack = null;
     await _musicPlayer.stop();
   }
