@@ -73,6 +73,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 60,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 3,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.stunned, duration: 1, chance: 25)],
       ),
       Ability(
         name: 'Whirlwind',
@@ -206,6 +207,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 1,
         isBasicAttack: true,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.weakened, duration: 2, magnitude: 20)],
       ),
       Ability(
         name: 'Heal',
@@ -275,6 +277,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         isBasicAttack: true,
         minTargets: 2,
         maxTargets: 4,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.silenced, duration: 1)],
       ),
       Ability(
         name: 'Fireball',
@@ -341,6 +344,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 1,
         isBasicAttack: true,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.burning, duration: 2, magnitude: 8)],
       ),
       Ability(
         name: 'Lay on Hands',
@@ -409,6 +413,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 1,
         isBasicAttack: true,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.bleeding, duration: 2, magnitude: 8)],
       ),
       Ability(
         name: 'Twin Shot',
@@ -548,6 +553,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 1,
         isBasicAttack: true,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.slowed, duration: 2, magnitude: 30)],
       ),
       Ability(
         name: 'Summon Wolf',
@@ -621,6 +627,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         unlockedAtLevel: 1,
         isBasicAttack: true,
         isPhysicalAttack: true,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.exposed, duration: 1, magnitude: 25, chance: 30)],
       ),
       Ability(
         name: 'Flame Blade',
@@ -630,6 +637,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 75,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 3,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.burning, duration: 2, magnitude: 8)],
       ),
       Ability(
         name: 'Rune Strike',
@@ -640,6 +648,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 5,
         isPhysicalAttack: true,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.silenced, duration: 1, chance: 40)],
       ),
       Ability(
         name: 'Thunder Cleave',
@@ -649,6 +658,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 50,
         targetType: AbilityTarget.allEnemies,
         unlockedAtLevel: 8,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.stunned, duration: 1, chance: 25)],
       ),
       Ability(
         name: 'Arcane Annihilation',
@@ -658,6 +668,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 30,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 11,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.exposed, duration: 2, magnitude: 30), AppliedEffect(type: StatusEffectType.weakened, duration: 1, magnitude: 25)],
       ),
     ],
   ),
@@ -860,6 +871,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 50,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 4,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.stunned, duration: 1, chance: 20)],
       ),
       Ability(
         name: 'War Cry',
@@ -928,6 +940,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 5,
         chaotic: true,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.burning, duration: 1, magnitude: 8)],
       ),
       Ability(
         name: 'Arcane Storm',
@@ -977,6 +990,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 1,
         isBasicAttack: true,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.cursed, duration: 2)],
       ),
       Ability(
         name: 'Summon Skeleton',
@@ -1045,6 +1059,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 1,
         isBasicAttack: true,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.slowed, duration: 1, magnitude: 25, chance: 30)],
       ),
       Ability(
         name: 'Deploy Turret',
@@ -1053,6 +1068,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 50,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 2,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.bleeding, duration: 2, magnitude: 8)],
       ),
       Ability(
         name: 'Repair',
@@ -1069,6 +1085,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 35,
         targetType: AbilityTarget.allEnemies,
         unlockedAtLevel: 7,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.burning, duration: 1, magnitude: 8), AppliedEffect(type: StatusEffectType.stunned, duration: 1, chance: 20)],
       ),
       Ability(
         name: 'Mech Suit',
@@ -1128,6 +1145,7 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
         refreshChance: 50,
         targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 5,
+        appliesStatusEffects: [AppliedEffect(type: StatusEffectType.exposed, duration: 2, magnitude: 25)],
       ),
       Ability(
         name: 'Aura of Light',
