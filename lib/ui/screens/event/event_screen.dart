@@ -25,6 +25,7 @@ class EventScreen extends ConsumerStatefulWidget {
 class _EventScreenState extends ConsumerState<EventScreen> {
   late GameEvent _event;
   String? _result;
+  String? _hazardTargetName;
   bool _showExplorePrompt = false;
   bool _showStoryDialog = false;
   bool _showArtUpgrade = false;
@@ -40,6 +41,16 @@ class _EventScreenState extends ConsumerState<EventScreen> {
     final gameState = ref.read(gameStateProvider);
     final mapDef = getMapDefinition(gameState?.currentMapDefinitionId ?? 1);
     final rng = Random();
+
+    // 25% chance for a map-specific hazard event
+    if (rng.nextInt(4) == 0) {
+      final hazard = selectHazardForMap(mapDef.name, rng);
+      if (hazard != null) {
+        _event = hazard;
+        return;
+      }
+    }
+
     final theme = (mapDef.secondaryEventTheme != null && rng.nextInt(5) == 0)
         ? mapDef.secondaryEventTheme!
         : mapDef.eventTheme;
@@ -91,6 +102,14 @@ class _EventScreenState extends ConsumerState<EventScreen> {
         if (char.isAlive) {
           char.currentHp = (char.currentHp + choice.hpChange).clamp(1, char.totalMaxHp);
         }
+      }
+    }
+    if (choice.hpChangeSingle != 0) {
+      final alive = gameState.party.where((c) => c.isAlive).toList();
+      if (alive.isNotEmpty) {
+        final target = alive[Random().nextInt(alive.length)];
+        target.currentHp = (target.currentHp + choice.hpChangeSingle).clamp(1, target.totalMaxHp);
+        _hazardTargetName = target.name;
       }
     }
 
@@ -281,7 +300,9 @@ class _EventScreenState extends ConsumerState<EventScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    _result!,
+                    _hazardTargetName != null
+                        ? '$_result\n$_hazardTargetName took the hit!'
+                        : _result!,
                     style: theme.textTheme.bodyLarge,
                     textAlign: TextAlign.center,
                   ),

@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -49,6 +50,7 @@ class _AttackLineData {
   final bool isSpell;
   final SpellType spellType;
   final int overkill;
+  final String? abilityIcon; // icon name from abilityIconMap (e.g. 'sword', 'arrow')
   const _AttackLineData(
     this.attackerId,
     this.targetId,
@@ -57,6 +59,7 @@ class _AttackLineData {
     this.isSpell, {
     this.spellType = SpellType.normal,
     this.overkill = 0,
+    this.abilityIcon,
   });
 }
 
@@ -82,6 +85,9 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
   List<_AttackLineData> _attackLines = [];
   late final AnimationController _lineAnimController;
   late final Animation<double> _lineProgress;
+
+  // Cached ability icon images for the attack line painter
+  final Map<String, ui.Image> _iconCache = {};
 
   // Army fight flag
   bool _isArmyFight = false;
@@ -112,7 +118,23 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     );
     _backgroundPath =
         'assets/sprites/backgrounds/meadow.png'; // default, set in _initCombat
+    _preloadAbilityIcons();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initCombat());
+  }
+
+  Future<void> _preloadAbilityIcons() async {
+    // Collect unique icon names from all ability icons
+    final iconNames = abilityIconMap.values.toSet();
+    for (final name in iconNames) {
+      try {
+        final data = await rootBundle.load('assets/sprites/abilities/$name.png');
+        final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+        final frame = await codec.getNextFrame();
+        _iconCache[name] = frame.image;
+      } catch (_) {
+        // Icon not found — skip
+      }
+    }
   }
 
   void _initCombat() {
@@ -505,6 +527,8 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
 
     // Track raw damage per enemy for overkill display
     final rawDamageByEnemy = <String, int>{};
+    // Track chain target order for chain lightning visual
+    final chainTargetOrder = <String>[];
 
     String log;
     if (ability.darkPact) {
@@ -514,6 +538,33 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         char,
         _combat!.enemies.where((e) => e.isAlive).toList(),
       );
+    } else if (ability.chainChance > 0) {
+      // Chain: hit initial target, then roll chainChance to arc to another
+      final logs = <String>[];
+      final aliveEnemies = _combat!.enemies.where((e) => e.isAlive).toList();
+      final hitIds = <String>{};
+      var currentTarget = target as Enemy;
+      while (true) {
+        final result = CombatService.executeAllyTurn(
+          char,
+          ability,
+          currentTarget,
+          healingMultiplier: _healingMultiplier,
+        );
+        logs.add(result.$1);
+        rawDamageByEnemy[currentTarget.id] =
+            (rawDamageByEnemy[currentTarget.id] ?? 0) + result.$2;
+        hitIds.add(currentTarget.id);
+        chainTargetOrder.add(currentTarget.id);
+        // Roll to chain
+        final remaining = aliveEnemies
+            .where((e) => e.isAlive && !hitIds.contains(e.id))
+            .toList();
+        if (remaining.isEmpty) break;
+        if (Random().nextInt(100) >= ability.chainChance) break;
+        currentTarget = remaining[Random().nextInt(remaining.length)];
+      }
+      log = logs.join(' ');
     } else if (ability.minTargets > 0) {
       // Multi-target: if alive <= minTargets, hit all; otherwise pick random unique targets
       final aliveEnemies = _combat!.enemies.where((e) => e.isAlive).toList();
@@ -684,26 +735,53 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
         char.characterClass == CharacterClass.wizard && !ability.isBasicAttack
         ? _getSpellType(ability)
         : SpellType.normal;
+    final iconName = abilityIconMap[ability.name];
 
     // Build attack lines from HP diffs (main attack only, using pre-pierce snapshot)
     final isSpell = !ability.isBasicAttack;
     final lines = <_AttackLineData>[];
-    for (final e in _combat!.enemies) {
-      final diff = enemyHpBefore[e.id]! - enemyHpAfterMain[e.id]!;
-      if (diff > 0) {
-        final raw = rawDamageByEnemy[e.id] ?? diff;
-        final overkill = max(0, raw - diff);
-        lines.add(
-          _AttackLineData(
-            char.id,
-            e.id,
-            diff,
-            false,
-            isSpell,
-            spellType: attackSpellType,
-            overkill: overkill,
-          ),
-        );
+    if (chainTargetOrder.isNotEmpty && attackSpellType == SpellType.chainLightning) {
+      // Chain lightning: lines chain caster→target1→target2→...
+      String sourceId = char.id;
+      for (final targetId in chainTargetOrder) {
+        final e = _combat!.enemies.firstWhere((e) => e.id == targetId);
+        final diff = enemyHpBefore[e.id]! - enemyHpAfterMain[e.id]!;
+        if (diff > 0) {
+          final raw = rawDamageByEnemy[e.id] ?? diff;
+          final overkill = max(0, raw - diff);
+          lines.add(
+            _AttackLineData(
+              sourceId,
+              e.id,
+              diff,
+              false,
+              isSpell,
+              spellType: attackSpellType,
+              overkill: overkill,
+            ),
+          );
+        }
+        sourceId = targetId;
+      }
+    } else {
+      for (final e in _combat!.enemies) {
+        final diff = enemyHpBefore[e.id]! - enemyHpAfterMain[e.id]!;
+        if (diff > 0) {
+          final raw = rawDamageByEnemy[e.id] ?? diff;
+          final overkill = max(0, raw - diff);
+          lines.add(
+            _AttackLineData(
+              char.id,
+              e.id,
+              diff,
+              false,
+              isSpell,
+              spellType: attackSpellType,
+              overkill: overkill,
+              abilityIcon: iconName,
+            ),
+          );
+        }
       }
     }
 
@@ -1247,6 +1325,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                       lines: _attackLines,
                       positionOf: (id) => _combatantEdge(id, bfSize),
                       progress: _lineProgress.value,
+                      iconCache: _iconCache,
                     ),
                   ),
                 ),
@@ -1893,16 +1972,32 @@ class _AttackLinePainter extends CustomPainter {
   final List<_AttackLineData> lines;
   final Offset Function(String id) positionOf;
   final double progress; // 0.0 → 1.0
+  final Map<String, ui.Image> iconCache;
 
   _AttackLinePainter({
     required this.lines,
     required this.positionOf,
     required this.progress,
+    required this.iconCache,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Collect meteor lines to paint as a single big meteor
+    final meteorLines = lines.where((l) => l.spellType == SpellType.meteor).toList();
+    if (meteorLines.isNotEmpty) {
+      _paintMeteorStrike(canvas, size, meteorLines);
+    }
+
+    // Collect chain lightning lines to paint as chaining zigzag bolts
+    final chainLines = lines.where((l) => l.spellType == SpellType.chainLightning).toList();
+    if (chainLines.isNotEmpty) {
+      _paintChainLightningStrike(canvas, chainLines);
+    }
+
     for (final line in lines) {
+      if (line.spellType == SpellType.meteor) continue; // handled above
+      if (line.spellType == SpellType.chainLightning) continue; // handled above
       final from = positionOf(line.attackerId);
       final to = positionOf(line.targetId);
       _paintLine(canvas, from, to, line);
@@ -1928,11 +2023,9 @@ class _AttackLinePainter extends CustomPainter {
           _paintIceStorm(canvas, from, to, line);
           break;
         case SpellType.chainLightning:
-          _paintChainLightning(canvas, from, to, line);
-          break;
+          break; // handled by _paintChainLightningStrike
         case SpellType.meteor:
-          _paintMeteor(canvas, from, to, line);
-          break;
+          break; // handled by _paintMeteorStrike
         case SpellType.summonWolf:
           _paintSummonWolf(canvas, from, to, line);
           break;
@@ -1974,11 +2067,24 @@ class _AttackLinePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
     canvas.drawLine(from, currentTo, linePaint);
     if (progress < 1.0) {
-      canvas.drawCircle(
-        currentTo,
-        5,
-        Paint()..color = color.withValues(alpha: 0.7),
-      );
+      // Draw ability icon at the projectile tip, or fall back to circle
+      final icon = line.abilityIcon != null ? iconCache[line.abilityIcon] : null;
+      if (icon != null) {
+        const iconSize = 24.0;
+        final src = Rect.fromLTWH(
+          0, 0, icon.width.toDouble(), icon.height.toDouble(),
+        );
+        final dst = Rect.fromCenter(
+          center: currentTo, width: iconSize, height: iconSize,
+        );
+        canvas.drawImageRect(icon, src, dst, Paint());
+      } else {
+        canvas.drawCircle(
+          currentTo,
+          5,
+          Paint()..color = color.withValues(alpha: 0.7),
+        );
+      }
     }
     if (progress > 0.5) {
       _drawDamageLabel(
@@ -2394,147 +2500,250 @@ class _AttackLinePainter extends CustomPainter {
     }
   }
 
-  void _paintChainLightning(
+  /// Chain lightning: zigzag bolt travels from source to target for each chain
+  /// segment, sequenced so each arc animates after the previous one arrives.
+  void _paintChainLightningStrike(
     Canvas canvas,
-    Offset from,
-    Offset to,
-    _AttackLineData line,
+    List<_AttackLineData> chainLines,
   ) {
-    final amount = line.amount;
     final yellow = const Color(0xFFFFEB3B);
+    final white = const Color(0xFFFFFFFF);
     final black = Colors.black;
-    final xDiff = to.dx - from.dx;
-    final yDiff = to.dy - from.dy;
-    final currentProgress = progress.clamp(0.0, 1.0);
-    // Draw jagged lightning bolt
-    final points = <Offset>[from];
-    final segments = 5;
-    for (int i = 1; i < segments; i++) {
-      final t = i / segments;
-      final baseX = from.dx + xDiff * t;
-      final baseY = from.dy + yDiff * t;
-      final offset = (sin(currentProgress * 8.0 * pi + i) * 12 * (1 - t));
-      points.add(Offset(baseX + offset, baseY));
-    }
-    points.add(to);
-    // Black outline
-    for (int i = 0; i < points.length - 1; i++) {
-      canvas.drawLine(
-        points[i],
-        points[i + 1],
-        Paint()
-          ..color = black
-          ..strokeWidth = 4.0
-          ..style = PaintingStyle.stroke,
-      );
-    }
-    // Yellow core
-    for (int i = 0; i < points.length - 1; i++) {
-      canvas.drawLine(
-        points[i],
-        points[i + 1],
-        Paint()
-          ..color = yellow
-          ..strokeWidth = 2.0
-          ..style = PaintingStyle.stroke,
-      );
-    }
-    if (progress > 0.5) {
-      _drawDamageLabel(
-        canvas,
-        from,
-        to,
-        amount,
-        false,
-        yellow,
-        overkill: line.overkill,
-      );
+    final p = progress.clamp(0.0, 1.0);
+
+    final segCount = chainLines.length;
+    // Each chain segment gets an equal slice of the animation time
+    final segDuration = 1.0 / segCount;
+
+    for (int s = 0; s < segCount; s++) {
+      final line = chainLines[s];
+      final from = positionOf(line.attackerId);
+      final to = positionOf(line.targetId);
+      final segStart = s * segDuration;
+
+      // How far this segment has progressed (0 = not started, 1 = arrived)
+      final segProgress = ((p - segStart) / segDuration).clamp(0.0, 1.0);
+      if (segProgress <= 0.0) continue;
+
+      // Build zigzag points from source toward target
+      final dx = to.dx - from.dx;
+      final dy = to.dy - from.dy;
+      final dist = sqrt(dx * dx + dy * dy);
+      final perpX = -dy / dist;
+      final perpY = dx / dist;
+
+      final zigzagSegments = 7;
+      final points = <Offset>[from];
+      for (int i = 1; i < zigzagSegments; i++) {
+        final t = i / zigzagSegments;
+        if (t > segProgress) break;
+        final baseX = from.dx + dx * t;
+        final baseY = from.dy + dy * t;
+        // Alternating perpendicular offset for zigzag
+        final jag = (i % 2 == 0 ? 1 : -1) * 10.0;
+        points.add(Offset(baseX + perpX * jag, baseY + perpY * jag));
+      }
+      // Add the bolt tip at current progress
+      final tipX = from.dx + dx * segProgress;
+      final tipY = from.dy + dy * segProgress;
+      points.add(Offset(tipX, tipY));
+
+      // Draw black outline
+      for (int i = 0; i < points.length - 1; i++) {
+        canvas.drawLine(
+          points[i],
+          points[i + 1],
+          Paint()
+            ..color = black
+            ..strokeWidth = 5.0
+            ..style = PaintingStyle.stroke,
+        );
+      }
+      // Yellow core
+      for (int i = 0; i < points.length - 1; i++) {
+        canvas.drawLine(
+          points[i],
+          points[i + 1],
+          Paint()
+            ..color = yellow
+            ..strokeWidth = 2.5
+            ..style = PaintingStyle.stroke,
+        );
+      }
+      // White-hot center
+      for (int i = 0; i < points.length - 1; i++) {
+        canvas.drawLine(
+          points[i],
+          points[i + 1],
+          Paint()
+            ..color = white.withValues(alpha: 0.6)
+            ..strokeWidth = 1.0
+            ..style = PaintingStyle.stroke,
+        );
+      }
+
+      // Glow at bolt tip
+      if (segProgress < 1.0) {
+        canvas.drawCircle(
+          points.last,
+          6,
+          Paint()..color = yellow.withValues(alpha: 0.5),
+        );
+      }
+
+      // Impact flash and damage label when segment arrives
+      if (segProgress >= 1.0) {
+        canvas.drawCircle(
+          to,
+          12,
+          Paint()..color = yellow.withValues(alpha: 0.3),
+        );
+        _drawDamageLabel(
+          canvas,
+          from,
+          to,
+          line.amount,
+          false,
+          yellow,
+          overkill: line.overkill,
+        );
+      }
     }
   }
 
-  void _paintMeteor(
+  /// Single big meteor falling at ~70° angle toward the center of all targets.
+  void _paintMeteorStrike(
     Canvas canvas,
-    Offset from,
-    Offset to,
-    _AttackLineData line,
+    Size size,
+    List<_AttackLineData> meteorLines,
   ) {
-    final amount = line.amount;
     final darkRed = const Color(0xFF8B0000);
     final orangeRed = const Color(0xFFFF4500);
     final gold = const Color(0xFFFFD700);
-    final currentTo = Offset(
-      from.dx + (to.dx - from.dx) * progress,
-      from.dy + (to.dy - from.dy) * progress,
+
+    // Compute center of all target positions
+    double cx = 0, cy = 0;
+    final targetPositions = <Offset>[];
+    for (final line in meteorLines) {
+      final pos = positionOf(line.targetId);
+      targetPositions.add(pos);
+      cx += pos.dx;
+      cy += pos.dy;
+    }
+    cx /= meteorLines.length;
+    cy /= meteorLines.length;
+    final impactPoint = Offset(cx, cy);
+
+    // ~70° from horizontal means mostly vertical descent, slightly from the left.
+    // tan(70°) ≈ 2.75, so for every 1 pixel horizontal, move 2.75 vertical.
+    const angle70 = 70.0 * pi / 180.0;
+    final travelDistance = size.height * 0.8;
+    final startPoint = Offset(
+      impactPoint.dx - cos(angle70) * travelDistance,
+      impactPoint.dy - sin(angle70) * travelDistance,
     );
-    final meteorSize = 8.0 + (progress * 18.0);
-    // Dark outer ring
-    canvas.drawCircle(currentTo, meteorSize, Paint()..color = darkRed);
-    // Orange mid layer
-    canvas.drawCircle(currentTo, meteorSize * 0.75, Paint()..color = orangeRed);
-    // Gold core
-    canvas.drawCircle(currentTo, meteorSize * 0.5, Paint()..color = gold);
+
+    final p = progress.clamp(0.0, 1.0);
+    final meteorPos = Offset(
+      startPoint.dx + (impactPoint.dx - startPoint.dx) * p,
+      startPoint.dy + (impactPoint.dy - startPoint.dy) * p,
+    );
+
+    final meteorSize = 14.0 + (p * 20.0);
+
+    if (p < 0.95) {
+      // Draw fiery trail
+      final trailLength = 6;
+      for (int i = trailLength; i >= 1; i--) {
+        final t = (p - i * 0.03).clamp(0.0, 1.0);
+        final trailPos = Offset(
+          startPoint.dx + (impactPoint.dx - startPoint.dx) * t,
+          startPoint.dy + (impactPoint.dy - startPoint.dy) * t,
+        );
+        final trailSize = meteorSize * (1.0 - i * 0.12);
+        final alpha = (0.5 - i * 0.07).clamp(0.05, 0.5);
+        canvas.drawCircle(
+          trailPos,
+          trailSize,
+          Paint()..color = orangeRed.withValues(alpha: alpha),
+        );
+      }
+
+      // Meteor body
+      canvas.drawCircle(meteorPos, meteorSize, Paint()..color = darkRed);
+      canvas.drawCircle(meteorPos, meteorSize * 0.75, Paint()..color = orangeRed);
+      canvas.drawCircle(meteorPos, meteorSize * 0.5, Paint()..color = gold);
+    }
+
     // Explosion at impact
-    if (progress >= 0.95) {
-      final expRadius = meteorSize * 2.5;
+    if (p >= 0.95) {
+      // Big central explosion
+      final expProgress = ((p - 0.95) / 0.05).clamp(0.0, 1.0);
+      final expRadius = 40.0 + expProgress * 30.0;
       canvas.drawCircle(
-        currentTo,
+        impactPoint,
         expRadius,
-        Paint()..color = darkRed.withValues(alpha: 0.25),
+        Paint()..color = darkRed.withValues(alpha: 0.3),
       );
       canvas.drawCircle(
-        currentTo,
+        impactPoint,
         expRadius * 0.7,
         Paint()..color = orangeRed.withValues(alpha: 0.5),
       );
       canvas.drawCircle(
-        currentTo,
+        impactPoint,
         expRadius * 0.4,
-        Paint()..color = gold.withValues(alpha: 0.6),
+        Paint()..color = gold.withValues(alpha: 0.7),
       );
-      final overkillText = line.overkill > 0
-          ? ' (${line.overkill} overkill)'
-          : '';
-      final tp = TextPainter(
-        text: TextSpan(
-          children: [
-            TextSpan(
-              text: '-$amount',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                shadows: [Shadow(color: darkRed, blurRadius: 8)],
-              ),
-            ),
-            if (overkillText.isNotEmpty)
+
+      // Damage labels per target
+      for (final line in meteorLines) {
+        final targetPos = positionOf(line.targetId);
+        final overkillText = line.overkill > 0
+            ? ' (${line.overkill} overkill)'
+            : '';
+        final tp = TextPainter(
+          text: TextSpan(
+            children: [
               TextSpan(
-                text: overkillText,
+                text: '-${line.amount}',
                 style: TextStyle(
-                  color: const Color(0xFFFFD700),
-                  fontSize: 14,
+                  color: Colors.white,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   shadows: [Shadow(color: darkRed, blurRadius: 8)],
                 ),
               ),
-          ],
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: currentTo,
-            width: tp.width + 14,
-            height: tp.height + 8,
+              if (overkillText.isNotEmpty)
+                TextSpan(
+                  text: overkillText,
+                  style: TextStyle(
+                    color: const Color(0xFFFFD700),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    shadows: [Shadow(color: darkRed, blurRadius: 8)],
+                  ),
+                ),
+            ],
           ),
-          const Radius.circular(4),
-        ),
-        Paint()..color = darkRed.withValues(alpha: 0.8),
-      );
-      tp.paint(
-        canvas,
-        Offset(currentTo.dx - tp.width / 2, currentTo.dy - tp.height / 2 - 20),
-      );
+          textDirection: TextDirection.ltr,
+        )..layout();
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: targetPos.translate(0, -20),
+              width: tp.width + 14,
+              height: tp.height + 8,
+            ),
+            const Radius.circular(4),
+          ),
+          Paint()..color = darkRed.withValues(alpha: 0.8),
+        );
+        tp.paint(
+          canvas,
+          Offset(targetPos.dx - tp.width / 2, targetPos.dy - tp.height / 2 - 20),
+        );
+      }
     }
   }
 
