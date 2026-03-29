@@ -1066,17 +1066,27 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
   Offset _combatantEdge(String id, Size size) {
     final allyIdx = _combat!.allies.indexWhere((a) => a.id == id);
     if (allyIdx >= 0) {
-      final n = _combat!.allies.length;
-      final sprite = _spriteSize(n);
       final ally = _combat!.allies[allyIdx];
-      final frontLineOffset = ally.isFrontLine ? 24.0 : 0.0;
-      return Offset(
-        size.width * 0.25 +
-            sprite / 2 +
-            4 +
-            frontLineOffset, // right edge of ally sprite
-        size.height * (allyIdx + 1) / (n + 1),
-      );
+      final frontLiners = _combat!.allies.where((a) => a.isFrontLine).toList();
+      final backLiners = _combat!.allies.where((a) => !a.isFrontLine).toList();
+
+      if (ally.isFrontLine) {
+        final idxInCol = frontLiners.indexOf(ally);
+        final n = frontLiners.length;
+        // Front liners are in the right half of the left 50% (x = 0.25-0.50)
+        return Offset(
+          size.width * 0.375,
+          size.height * (idxInCol + 1) / (n + 1),
+        );
+      } else {
+        final idxInCol = backLiners.indexOf(ally);
+        final n = backLiners.length;
+        // Back liners are in the left half of the left 50% (x = 0.0-0.25)
+        return Offset(
+          size.width * 0.125,
+          size.height * (idxInCol + 1) / (n + 1),
+        );
+      }
     }
     final enemyIdx = _combat!.enemies.indexWhere((e) => e.id == id);
     if (enemyIdx >= 0) {
@@ -1128,43 +1138,11 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             children: [
               _buildTopBar(theme, currentCombatant),
               Expanded(
-                flex: 4,
                 child: _buildBattlefield(theme, currentCombatant),
               ),
-              const Divider(height: 1),
-              Expanded(
-                flex: 1,
-                child: Container(
-                  color: theme.colorScheme.surfaceContainerLowest,
-                  child: ListView.builder(
-                    controller: _logController,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    itemCount: _combat!.combatLog.length,
-                    itemBuilder: (context, index) {
-                      final text = _combat!.combatLog[index];
-                      final isRoundHeader = text.startsWith('---');
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 1),
-                        child: Text(
-                          text,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: isRoundHeader ? FontWeight.bold : null,
-                            color: isRoundHeader
-                                ? theme.colorScheme.primary
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              if (_waitingForInput && !_combat!.isComplete)
-                _buildAbilityBar(theme)
-              else if (_combat!.isComplete)
+              // Fixed bottom panel: abilities left, combat log right
+              _buildBottomPanel(theme),
+              if (_combat!.isComplete)
                 _buildCombatEndBar(theme),
             ],
           ),
@@ -1280,60 +1258,36 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             Positioned.fill(
               child: Row(
                 children: [
-                  // HEROES (left)
+                  // HEROES (left) - back line far left, front line closer to enemies
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         vertical: 8,
                         horizontal: 4,
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: _combat!.allies.map((ally) {
-                          final isCurrentTurn = currentCombatant?.id == ally.id;
-                          final isHealTarget =
-                              (_selectedAbility != null &&
-                                  _selectedAbility!.damage < 0 &&
-                                  _selectedAbility!.targetType ==
-                                      AbilityTarget.singleAlly &&
-                                  ally.isAlive) ||
-                              (_potionMode && ally.isAlive);
-                          // Front liners shift right (closer to enemies)
-                          final frontLineOffset = ally.isFrontLine ? 24.0 : 0.0;
-                          return Flexible(
-                            child: Padding(
-                              padding: EdgeInsets.only(left: frontLineOffset),
-                              child: GestureDetector(
-                                onTap:
-                                    isHealTarget || ref.read(helpModeProvider)
-                                    ? () {
-                                        if (ref.read(helpModeProvider)) {
-                                          ref
-                                                  .read(
-                                                    helpModeProvider.notifier,
-                                                  )
-                                                  .state =
-                                              false;
-                                          showCharacterHelp(context, ally);
-                                          return;
-                                        }
-                                        if (_potionMode) {
-                                          _usePotion(ally);
-                                        } else {
-                                          _useAbility(_selectedAbility!, ally);
-                                        }
-                                      }
-                                    : null,
-                                child: _buildAllyWidget(
-                                  theme,
-                                  ally,
-                                  isCurrentTurn,
-                                  isHealTarget,
-                                ),
-                              ),
+                      child: Row(
+                        children: [
+                          // Back liners (left column)
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: _combat!.allies
+                                  .where((a) => !a.isFrontLine)
+                                  .map((ally) => _buildAllySlot(context, theme, ally, currentCombatant))
+                                  .toList(),
                             ),
-                          );
-                        }).toList(),
+                          ),
+                          // Front liners (right column, closer to enemies)
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: _combat!.allies
+                                  .where((a) => a.isFrontLine)
+                                  .map((ally) => _buildAllySlot(context, theme, ally, currentCombatant))
+                                  .toList(),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1429,6 +1383,35 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     );
   }
 
+  Widget _buildAllySlot(BuildContext context, ThemeData theme, Character ally, CombatantEntry? currentCombatant) {
+    final isCurrentTurn = currentCombatant?.id == ally.id;
+    final isHealTarget =
+        (_selectedAbility != null &&
+            _selectedAbility!.damage < 0 &&
+            _selectedAbility!.targetType == AbilityTarget.singleAlly &&
+            ally.isAlive) ||
+        (_potionMode && ally.isAlive);
+    return Flexible(
+      child: GestureDetector(
+        onTap: isHealTarget || ref.read(helpModeProvider)
+            ? () {
+                if (ref.read(helpModeProvider)) {
+                  ref.read(helpModeProvider.notifier).state = false;
+                  showCharacterHelp(context, ally);
+                  return;
+                }
+                if (_potionMode) {
+                  _usePotion(ally);
+                } else {
+                  _useAbility(_selectedAbility!, ally);
+                }
+              }
+            : null,
+        child: _buildAllyWidget(theme, ally, isCurrentTurn, isHealTarget),
+      ),
+    );
+  }
+
   // -- Ally widget (vertical: name, sprite, hp bar, hp text) ----------------
   Widget _buildAllyWidget(
     ThemeData theme,
@@ -1436,7 +1419,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     bool isCurrentTurn,
     bool isHealTarget,
   ) {
-    final spriteSize = _spriteSize(_combat!.allies.length);
+    final spriteSize = _allySpriteSize(_combat!.allies.length);
     final storyProgress = ref.read(playerProfileProvider)?.classStoryProgress[ally.characterClass.name] ?? 0;
     final spritePath = classSpritePath(ally.characterClass, storyProgress);
 
@@ -1464,6 +1447,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             Text(
               ally.name.split(' ').first,
               style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
@@ -1524,7 +1508,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                             0.0,
                             1.0,
                           ),
-                          minHeight: 4,
+                          minHeight: 10,
                           color: Colors.cyan.shade300,
                           backgroundColor: Colors.cyan.shade900.withValues(
                             alpha: 0.3,
@@ -1539,7 +1523,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                           : BorderRadius.circular(3),
                       child: LinearProgressIndicator(
                         value: ally.currentHp / ally.totalMaxHp,
-                        minHeight: 5,
+                        minHeight: 12,
                         color: _hpColor(ally.currentHp / ally.totalMaxHp),
                         backgroundColor: Colors.black45,
                       ),
@@ -1552,7 +1536,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                     ? '${ally.currentHp}/${ally.totalMaxHp} +${ally.shieldHp}'
                     : '${ally.currentHp}/${ally.totalMaxHp}',
                 style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 9,
+                  fontSize: 22,
                   color: ally.shieldHp > 0
                       ? Colors.cyan.shade200
                       : Colors.white,
@@ -1563,7 +1547,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                 Text(
                   ally.activeStatusLabels.map((e) => e.$1).join(' · '),
                   style: theme.textTheme.labelSmall?.copyWith(
-                    fontSize: 8,
+                    fontSize: 20,
                     color: _statusColor(ally.activeStatusLabels.first.$2),
                     shadows: [const Shadow(color: Colors.black, blurRadius: 2)],
                   ),
@@ -1573,6 +1557,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
               Text(
                 'KO',
                 style: theme.textTheme.labelSmall?.copyWith(
+                  fontSize: 22,
                   color: Colors.red,
                   fontWeight: FontWeight.bold,
                   shadows: const [Shadow(color: Colors.black, blurRadius: 2)],
@@ -1607,6 +1592,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
             Text(
               enemy.name,
               style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
                 shadows: const [Shadow(color: Colors.black, blurRadius: 3)],
@@ -1634,7 +1620,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                   borderRadius: BorderRadius.circular(3),
                   child: LinearProgressIndicator(
                     value: enemy.currentHp / enemy.maxHp,
-                    minHeight: 5,
+                    minHeight: 12,
                     color: Colors.red,
                     backgroundColor: Colors.black45,
                   ),
@@ -1643,7 +1629,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
               Text(
                 '${enemy.currentHp}/${enemy.maxHp}',
                 style: theme.textTheme.labelSmall?.copyWith(
-                  fontSize: 9,
+                  fontSize: 22,
                   color: Colors.white,
                   shadows: const [Shadow(color: Colors.black, blurRadius: 2)],
                 ),
@@ -1652,7 +1638,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                 Text(
                   enemy.activeStatusLabels.map((e) => e.$1).join(' · '),
                   style: theme.textTheme.labelSmall?.copyWith(
-                    fontSize: 8,
+                    fontSize: 20,
                     color: _statusColor(enemy.activeStatusLabels.first.$2),
                     shadows: [const Shadow(color: Colors.black, blurRadius: 2)],
                   ),
@@ -1662,6 +1648,7 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
               Text(
                 'Defeated',
                 style: theme.textTheme.labelSmall?.copyWith(
+                  fontSize: 22,
                   color: Colors.grey,
                   shadows: const [Shadow(color: Colors.black, blurRadius: 2)],
                 ),
@@ -1678,6 +1665,13 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
     if (count <= 6) return 72;
     if (count <= 8) return 56;
     return 48;
+  }
+
+  double _allySpriteSize(int count) {
+    if (count <= 4) return 192;
+    if (count <= 6) return 144;
+    if (count <= 8) return 112;
+    return 96;
   }
 
   // -- Ability bar ----------------------------------------------------------
@@ -1958,6 +1952,291 @@ class _CombatScreenState extends ConsumerState<CombatScreen>
                     style: TextStyle(
                       color: theme.colorScheme.onPrimary,
                       fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -- Bottom panel: abilities left, combat log right -----------------------
+  Widget _buildBottomPanel(ThemeData theme) {
+    final current = _combat!.isComplete ? null : (_waitingForInput ? _combat!.currentCombatant : null);
+    final char = current != null ? _combat!.allies.firstWhere((c) => c.id == current.id) : null;
+    final abilities = char != null
+        ? char.abilities.where((a) => a.unlockedAtLevel <= char.level).toList()
+        : <Ability>[];
+    final available = char != null
+        ? CombatService.getAvailableAbilities(abilities, char.isSilenced)
+        : <Ability>[];
+
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.22,
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHigh,
+          border: Border(
+            top: BorderSide(
+              color: theme.colorScheme.outline.withValues(alpha: 0.3),
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            // Left: Ability buttons (6 slots)
+            SizedBox(
+              width: MediaQuery.of(context).size.width * 0.45,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: _buildAbilityGrid(theme, char, abilities, available),
+              ),
+            ),
+            VerticalDivider(width: 1, color: theme.colorScheme.outline.withValues(alpha: 0.3)),
+            // Right: Combat log with scrollbar
+            Expanded(
+              child: Scrollbar(
+                controller: _logController,
+                thumbVisibility: true,
+                child: ListView.builder(
+                  controller: _logController,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  itemCount: _combat!.combatLog.length,
+                  itemBuilder: (context, index) {
+                    final text = _combat!.combatLog[index];
+                    final isRoundHeader = text.startsWith('---');
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 1),
+                      child: Text(
+                        text,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: isRoundHeader ? FontWeight.bold : null,
+                          color: isRoundHeader ? theme.colorScheme.primary : null,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -- Ability grid (6 buttons: potion + up to 5 abilities) ----------------
+  Widget _buildAbilityGrid(ThemeData theme, Character? char, List<Ability> abilities, List<Ability> available) {
+    if (char == null) {
+      // Not player's turn — show disabled placeholders
+      return const Center(child: Text('Waiting...', style: TextStyle(color: Colors.white54)));
+    }
+
+    final potionCount = ref.read(gameStateProvider)?.healthPotions ?? 0;
+
+    // Build list of up to 6 buttons: potion + abilities
+    final buttons = <Widget>[];
+
+    // Potion button
+    buttons.add(_buildGridButton(
+      theme: theme,
+      label: 'Potion${potionCount > 0 ? ' ($potionCount)' : ''}',
+      icon: Icons.local_drink,
+      iconColor: _potionMode ? theme.colorScheme.onTertiary : Colors.red.shade400,
+      isSelected: _potionMode,
+      canUse: potionCount > 0,
+      selectedColor: theme.colorScheme.tertiary,
+      keyNumber: null,
+      onTap: potionCount > 0 ? () {
+        setState(() {
+          _potionMode = !_potionMode;
+          _selectedAbility = null;
+        });
+        if (_potionMode) {
+          final alive = _combat!.allies.where((a) => a.isAlive).toList();
+          if (alive.length == 1) _usePotion(alive.first);
+        }
+      } : null,
+    ));
+
+    // Ability buttons (up to 5)
+    for (int i = 0; i < abilities.length && i < 5; i++) {
+      final ability = abilities[i];
+      final isSelected = _selectedAbility?.name == ability.name;
+      final canUse = available.contains(ability);
+
+      buttons.add(_buildGridButton(
+        theme: theme,
+        label: ability.name,
+        abilityIcon: ability,
+        isSelected: isSelected,
+        canUse: canUse,
+        keyNumber: i + 1,
+        onTap: canUse ? () {
+          if (ref.read(helpModeProvider)) {
+            ref.read(helpModeProvider.notifier).state = false;
+            showAbilityHelp(context, ability);
+            return;
+          }
+          setState(() {
+            _selectedAbility = ability;
+            _potionMode = false;
+          });
+          if (ability.targetType == AbilityTarget.self) {
+            _useAbility(ability, char);
+          } else if (ability.targetType == AbilityTarget.allEnemies ||
+              ability.targetType == AbilityTarget.allAllies) {
+            _useAbility(ability, null);
+          } else if (ability.minTargets > 0) {
+            _useAbility(ability, null);
+          } else if (ability.targetType == AbilityTarget.singleEnemy) {
+            final alive = _combat!.enemies.where((e) => e.isAlive).toList();
+            if (alive.length == 1) _useAbility(ability, alive.first);
+          } else if (ability.targetType == AbilityTarget.singleAlly) {
+            final alive = _combat!.allies.where((a) => a.isAlive).toList();
+            if (alive.length == 1) _useAbility(ability, alive.first);
+          }
+        } : null,
+      ));
+    }
+
+    // Pad to 6 slots
+    while (buttons.length < 6) {
+      buttons.add(const SizedBox.shrink());
+    }
+
+    return GridView.count(
+      crossAxisCount: 3,
+      childAspectRatio: 2.5,
+      mainAxisSpacing: 4,
+      crossAxisSpacing: 4,
+      physics: const NeverScrollableScrollPhysics(),
+      children: buttons,
+    );
+  }
+
+  Widget _buildGridButton({
+    required ThemeData theme,
+    required String label,
+    IconData? icon,
+    Color? iconColor,
+    Ability? abilityIcon,
+    required bool isSelected,
+    required bool canUse,
+    int? keyNumber,
+    Color? selectedColor,
+    VoidCallback? onTap,
+  }) {
+    final bgColor = isSelected
+        ? (selectedColor ?? theme.colorScheme.primary)
+        : !canUse
+            ? Colors.grey.shade800
+            : theme.colorScheme.surfaceContainerHigh;
+    final fgColor = isSelected
+        ? (selectedColor != null ? theme.colorScheme.onTertiary : theme.colorScheme.onPrimary)
+        : !canUse
+            ? Colors.grey.shade500
+            : theme.colorScheme.onSurface;
+
+    // Build the icon widget
+    Widget? iconWidget;
+    if (icon != null) {
+      iconWidget = Icon(icon, size: 24, color: canUse ? (iconColor ?? fgColor) : Colors.grey.shade600);
+    } else if (abilityIcon != null) {
+      iconWidget = Image.asset(
+        abilityIconPath(abilityIcon.name),
+        width: 28,
+        height: 28,
+        filterQuality: FilterQuality.none,
+        errorBuilder: (context, error, stackTrace) => Icon(
+          abilityIcon.damage < 0 ? Icons.favorite : Icons.auto_awesome,
+          size: 24,
+          color: canUse ? fgColor : Colors.grey.shade600,
+        ),
+      );
+      if (!canUse) {
+        iconWidget = ColorFiltered(
+          colorFilter: const ColorFilter.matrix(<double>[
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0,      0,      0,      1, 0,
+          ]),
+          child: Opacity(opacity: 0.5, child: iconWidget),
+        );
+      }
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Opacity(
+        opacity: canUse ? 1.0 : 0.6,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected
+                      ? (selectedColor ?? theme.colorScheme.primary)
+                      : canUse
+                          ? theme.colorScheme.outline.withValues(alpha: 0.5)
+                          : Colors.grey.shade700,
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              padding: const EdgeInsets.all(2),
+              child: Column(
+                children: [
+                  // Ability name at top
+                  Text(
+                    label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontSize: 9,
+                      fontWeight: canUse ? FontWeight.bold : FontWeight.normal,
+                      color: fgColor,
+                      height: 1.1,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  // Icon fills remaining space
+                  if (iconWidget != null)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          child: iconWidget,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (keyNumber != null)
+              Positioned(
+                top: -2,
+                left: -2,
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: canUse ? theme.colorScheme.primary : Colors.grey.shade700,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '$keyNumber',
+                    style: TextStyle(
+                      color: canUse ? theme.colorScheme.onPrimary : Colors.grey.shade500,
+                      fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

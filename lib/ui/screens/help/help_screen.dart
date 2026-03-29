@@ -179,7 +179,7 @@ class _ClassCard extends StatelessWidget {
           // Art tiers row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: _buildArtTiers(cls, progress, theme),
+            child: _buildArtTiers(context, cls, progress, theme),
           ),
           // Two-column body: abilities left, story timeline right
           Padding(
@@ -219,7 +219,7 @@ class _ClassCard extends StatelessWidget {
     );
   }
 
-  Widget _buildArtTiers(ClassDefinition cls, int progress, ThemeData theme) {
+  Widget _buildArtTiers(BuildContext context, ClassDefinition cls, int progress, ThemeData theme) {
     final currentTier = artTierForProgress(progress);
     final tiers = [
       ('low', 'Basic', 0),
@@ -237,13 +237,14 @@ class _ClassCard extends StatelessWidget {
               child: Icon(Icons.arrow_forward, size: 14,
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
             ),
-          _buildArtTierImage(cls, tiers[i], currentTier, progress, theme),
+          _buildArtTierImage(context, cls, tiers[i], currentTier, progress, theme),
         ],
       ],
     );
   }
 
   Widget _buildArtTierImage(
+    BuildContext context,
     ClassDefinition cls,
     (String tier, String label, int threshold) tierInfo,
     String currentTier,
@@ -276,18 +277,53 @@ class _ClassCard extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: isCurrent
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.2),
-              width: isCurrent ? 2 : 1,
+        GestureDetector(
+          onTap: () {
+            showDialog(
+              context: theme.platform == TargetPlatform.iOS ? context : context,
+              builder: (_) => Dialog(
+                backgroundColor: Colors.transparent,
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        constraints: const BoxConstraints(maxHeight: 500),
+                        child: Image.asset(
+                          path,
+                          filterQuality: FilterQuality.none,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(Icons.person, size: 200, color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${cls.name} — $label',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: isCurrent
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                width: isCurrent ? 2 : 1,
+              ),
             ),
+            padding: const EdgeInsets.all(4),
+            child: image,
           ),
-          padding: const EdgeInsets.all(4),
-          child: image,
         ),
         const SizedBox(height: 2),
         Text(
