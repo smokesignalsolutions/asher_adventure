@@ -6,15 +6,17 @@ class EventChoice {
   final String result;
   final int goldChange;
   final int hpChange;
-  const EventChoice({required this.text, required this.result, this.goldChange = 0, this.hpChange = 0});
+  final int hpChangeSingle; // damages/heals ONE random alive party member
+  const EventChoice({required this.text, required this.result, this.goldChange = 0, this.hpChange = 0, this.hpChangeSingle = 0});
 }
 
 class GameEvent {
   final String title;
   final String description;
   final String theme;
+  final String? mapName; // if set, this is a map-specific hazard event
   final List<EventChoice> choices;
-  const GameEvent({required this.title, required this.description, required this.theme, required this.choices});
+  const GameEvent({required this.title, required this.description, required this.theme, this.mapName, required this.choices});
 }
 
 const Map<String, List<CharacterClass>> themeClassAffinities = {
@@ -388,3 +390,375 @@ GameEvent selectEventForTheme(String theme, [Random? rng]) {
   }
   return themed[rng.nextInt(themed.length)];
 }
+
+/// Selects a map-specific hazard event, or null if none exist for this map.
+GameEvent? selectHazardForMap(String mapName, [Random? rng]) {
+  rng ??= Random();
+  final hazards = mapHazardEvents.where((e) => e.mapName == mapName).toList();
+  if (hazards.isEmpty) return null;
+  return hazards[rng.nextInt(hazards.length)];
+}
+
+// ── MAP-SPECIFIC HAZARD EVENTS ─────────────────────────────────
+const List<GameEvent> mapHazardEvents = [
+
+  // ── Forest ──
+  GameEvent(
+    theme: 'forest', mapName: 'Forest',
+    title: 'Falling Branch',
+    description: 'A loud CRACK echoes above. A massive branch is plummeting toward your party!',
+    choices: [
+      EventChoice(text: 'Dive out of the way', result: 'You dodge just in time, but one of your party catches a scrape.', hpChangeSingle: -10),
+      EventChoice(text: 'Try to catch it', result: 'Bad idea. The branch is way heavier than it looked.', hpChangeSingle: -20),
+      EventChoice(text: 'Shield the party', result: 'You take the hit but protect everyone else.', hpChangeSingle: -15),
+    ],
+  ),
+
+  // ── Desert ──
+  GameEvent(
+    theme: 'wild', mapName: 'Desert',
+    title: 'Sandstorm',
+    description: 'The horizon darkens. A wall of sand barrels toward you with terrifying speed.',
+    choices: [
+      EventChoice(text: 'Hunker down', result: 'You cover your faces and wait it out. The sand stings but you survive.', hpChange: -8),
+      EventChoice(text: 'Run for shelter', result: 'One of your party trips in the blinding sand.', hpChangeSingle: -18),
+      EventChoice(text: 'Push through it', result: 'You press on through the storm. Everyone takes a beating.', hpChange: -12),
+    ],
+  ),
+
+  // ── Swamp ──
+  GameEvent(
+    theme: 'wild', mapName: 'Swamp',
+    title: 'Bog Sinkhole',
+    description: 'The ground gives way! One of your party sinks waist-deep into thick, bubbling muck.',
+    choices: [
+      EventChoice(text: 'Pull them out quickly', result: 'You yank them free, but the suction wrenches their leg.', hpChangeSingle: -15),
+      EventChoice(text: 'Throw a rope', result: 'It takes a while but you haul them out safely. Just some bruises.', hpChangeSingle: -8),
+      EventChoice(text: 'Everyone help at once', result: 'You all crowd too close and the bank starts crumbling too.', hpChange: -5),
+    ],
+  ),
+
+  // ── Tundra ──
+  GameEvent(
+    theme: 'wild', mapName: 'Tundra',
+    title: 'Thin Ice',
+    description: 'You hear a sickening crack beneath your feet. The ice is giving way!',
+    choices: [
+      EventChoice(text: 'Spread out and crawl', result: 'You inch across on your bellies. Cold but safe. Mostly.', hpChange: -5),
+      EventChoice(text: 'Sprint across', result: 'One of your party plunges through into the freezing water!', hpChangeSingle: -22),
+      EventChoice(text: 'Go around', result: 'The long way takes its toll in the bitter cold.', hpChange: -8),
+    ],
+  ),
+
+  // ── Volcano ──
+  GameEvent(
+    theme: 'arcane', mapName: 'Volcano',
+    title: 'Lava Geyser',
+    description: 'The ground rumbles and a jet of molten rock erupts right beside the path!',
+    choices: [
+      EventChoice(text: 'Jump back!', result: 'You dodge the worst of it, but the heat singes everyone.', hpChange: -8),
+      EventChoice(text: 'Shield your face and run', result: 'Splatter catches one of your party. Ow!', hpChangeSingle: -20),
+      EventChoice(text: 'Wait for it to stop', result: 'The heat is brutal while you wait. Everyone is drenched in sweat.', hpChange: -10),
+    ],
+  ),
+
+  // ── Mountain Pass ──
+  GameEvent(
+    theme: 'martial', mapName: 'Mountain Pass',
+    title: 'Rockslide',
+    description: 'Boulders tumble down the mountainside! The path ahead is a gauntlet of falling stone.',
+    choices: [
+      EventChoice(text: 'Dash through', result: 'A rock clips one of your party on the shoulder. Could have been worse!', hpChangeSingle: -18),
+      EventChoice(text: 'Take cover under an overhang', result: 'Smart thinking. You wait it out with only minor debris.', hpChange: -5),
+      EventChoice(text: 'Try to climb above it', result: 'The climb is treacherous. Everyone takes scrapes.', hpChange: -8),
+    ],
+  ),
+
+  // ── Coastal Cliffs ──
+  GameEvent(
+    theme: 'wild', mapName: 'Coastal Cliffs',
+    title: 'Rogue Wave',
+    description: 'A massive wave surges up the cliffside, crashing over the narrow path!',
+    choices: [
+      EventChoice(text: 'Grab onto the rocks', result: 'The water batters you but you hold on. One party member loses their grip briefly.', hpChangeSingle: -15),
+      EventChoice(text: 'Drop flat and hold', result: 'The water washes over everyone. Cold and bruised but alive.', hpChange: -8),
+      EventChoice(text: 'Run to higher ground', result: 'You scramble up in time. Just some wet boots.', hpChange: -3),
+    ],
+  ),
+
+  // ── Plains ──
+  GameEvent(
+    theme: 'martial', mapName: 'Plains',
+    title: 'Stampede',
+    description: 'The ground shakes. A herd of wild beasts thunders across the plains directly at you!',
+    choices: [
+      EventChoice(text: 'Stand your ground and part them', result: 'Brave but risky. One of your party gets clipped by a horn.', hpChangeSingle: -18),
+      EventChoice(text: 'Dive to the side', result: 'You barely avoid the stampede. Everyone is shaken.', hpChange: -5),
+      EventChoice(text: 'Try to ride one', result: 'This was a terrible idea. Getting bucked off hurts.', hpChangeSingle: -25),
+    ],
+  ),
+
+  // ── Deep Jungle ──
+  GameEvent(
+    theme: 'forest', mapName: 'Deep Jungle',
+    title: 'Venomous Vines',
+    description: 'Barbed vines lash out from the undergrowth, wrapping around one of your party!',
+    choices: [
+      EventChoice(text: 'Cut them free', result: 'You hack through the vines. The thorns leave nasty cuts.', hpChangeSingle: -15),
+      EventChoice(text: 'Burn the vines', result: 'The fire works but the smoke chokes everyone.', hpChange: -8),
+      EventChoice(text: 'Pull them out by force', result: 'The thorns dig deeper as you pull. Painful but effective.', hpChangeSingle: -20),
+    ],
+  ),
+
+  // ── Cursed Wasteland ──
+  GameEvent(
+    theme: 'dark', mapName: 'Cursed Wasteland',
+    title: 'Curse Miasma',
+    description: 'A sickly purple fog rolls across the wasteland. It burns where it touches skin.',
+    choices: [
+      EventChoice(text: 'Hold your breath and push through', result: 'You make it through but the curse saps everyone\'s strength.', hpChange: -12),
+      EventChoice(text: 'Cover up and go slow', result: 'One party member\'s cloth slips. The miasma finds bare skin.', hpChangeSingle: -20),
+      EventChoice(text: 'Wait for it to pass', result: 'It lingers for hours. The ambient curse takes a toll.', hpChange: -10),
+    ],
+  ),
+
+  // ── Cave System ──
+  GameEvent(
+    theme: 'martial', mapName: 'Cave System',
+    title: 'Stalactite Collapse',
+    description: 'A tremor shakes the cave. Stalactites crack and plummet from the ceiling!',
+    choices: [
+      EventChoice(text: 'Shield your heads and run', result: 'A stalactite smashes into one of your party\'s shoulder!', hpChangeSingle: -18),
+      EventChoice(text: 'Hug the cave wall', result: 'Most debris misses you. A few sharp chips nick everyone.', hpChange: -6),
+      EventChoice(text: 'Freeze and hope for the best', result: 'A big one comes straight down. Direct hit!', hpChangeSingle: -25),
+    ],
+  ),
+
+  // ── Ancient Ruins ──
+  GameEvent(
+    theme: 'arcane', mapName: 'Ancient Ruins',
+    title: 'Trap Glyph',
+    description: 'One of your party steps on a glowing rune carved into the ancient floor. It flashes bright!',
+    choices: [
+      EventChoice(text: 'Jump away!', result: 'The blast catches them mid-air. At least it wasn\'t a direct hit.', hpChangeSingle: -15),
+      EventChoice(text: 'Try to dispel it', result: 'You channel your will but the glyph was too old and too strong.', hpChangeSingle: -20),
+      EventChoice(text: 'Everyone scatter!', result: 'The explosion sends shrapnel everywhere. Nobody escapes clean.', hpChange: -8),
+    ],
+  ),
+
+  // ── Catacombs ──
+  GameEvent(
+    theme: 'dark', mapName: 'Catacombs',
+    title: 'Collapsing Floor',
+    description: 'The ancient stonework crumbles. The floor opens up beneath one of your party!',
+    choices: [
+      EventChoice(text: 'Grab their hand!', result: 'You catch them! But the jagged stone cuts deep.', hpChangeSingle: -15),
+      EventChoice(text: 'Let them fall and find a way down', result: 'They land hard on a pile of bones below. Nothing broken... barely.', hpChangeSingle: -22),
+      EventChoice(text: 'Everyone back up', result: 'The whole section collapses. Dust and debris hurt everyone.', hpChange: -8),
+    ],
+  ),
+
+  // ── Underground Lake ──
+  GameEvent(
+    theme: 'martial', mapName: 'Underground Lake',
+    title: 'Whirlpool Current',
+    description: 'The underground lake surges! A powerful current drags at your legs as you cross a shallow.',
+    choices: [
+      EventChoice(text: 'Link arms and wade through', result: 'The current pulls hard but you stay together. Bruised ankles.', hpChange: -6),
+      EventChoice(text: 'Swim for it', result: 'One party member gets pulled under briefly. They swallow a lot of water.', hpChangeSingle: -18),
+      EventChoice(text: 'Find another way', result: 'The detour through narrow tunnels scrapes everyone up.', hpChange: -8),
+    ],
+  ),
+
+  // ── Goblin Warren ──
+  GameEvent(
+    theme: 'martial', mapName: 'Goblin Warren',
+    title: 'Goblin Trap',
+    description: 'CLICK. A tripwire. A net of thorny wire springs from the walls!',
+    choices: [
+      EventChoice(text: 'Cut through the net', result: 'The barbs shred one party member\'s arms as they hack through.', hpChangeSingle: -15),
+      EventChoice(text: 'Carefully untangle it', result: 'Slow but safe. Only minor pricks.', hpChange: -5),
+      EventChoice(text: 'Rip it apart by force', result: 'The barbs catch everyone as the net tears. Goblins build nasty traps.', hpChange: -10),
+    ],
+  ),
+
+  // ── Shadow Realm ──
+  GameEvent(
+    theme: 'dark', mapName: 'Shadow Realm',
+    title: 'Shadow Grasp',
+    description: 'Hands of pure darkness rise from the ground and claw at your party!',
+    choices: [
+      EventChoice(text: 'Fight through them', result: 'The shadows tear at one of your party before dissolving.', hpChangeSingle: -20),
+      EventChoice(text: 'Channel light energy', result: 'The light pushes them back but the effort exhausts everyone.', hpChange: -8),
+      EventChoice(text: 'Run!', result: 'The shadows give chase. Their cold touch saps life from everyone.', hpChange: -10),
+    ],
+  ),
+
+  // ── Enchanted Grove ──
+  GameEvent(
+    theme: 'forest', mapName: 'Enchanted Grove',
+    title: 'Wild Magic Surge',
+    description: 'The grove\'s magic pulses out of control! Sparks of raw enchantment crackle through the air.',
+    choices: [
+      EventChoice(text: 'Absorb the energy', result: 'Too much! The magic burns through one party member.', hpChangeSingle: -18),
+      EventChoice(text: 'Ground the magic', result: 'You redirect it into the earth. The backlash stings everyone.', hpChange: -6),
+      EventChoice(text: 'Wait it out behind a tree', result: 'A stray bolt finds one of you anyway. Trees don\'t stop magic.', hpChangeSingle: -15),
+    ],
+  ),
+
+  // ── Demon Fortress ──
+  GameEvent(
+    theme: 'arcane', mapName: 'Demon Fortress',
+    title: 'Fire Trap',
+    description: 'Jets of hellfire erupt from the fortress walls! The corridor becomes an inferno.',
+    choices: [
+      EventChoice(text: 'Sprint through', result: 'The flames lick at everyone. One party member gets singed badly.', hpChangeSingle: -20),
+      EventChoice(text: 'Time the jets and weave through', result: 'Mostly successful. Just some singed eyebrows.', hpChange: -5),
+      EventChoice(text: 'Barrel through together', result: 'The fire is brutal. Everyone feels the burn.', hpChange: -12),
+    ],
+  ),
+
+  // ── Sky Islands ──
+  GameEvent(
+    theme: 'dark', mapName: 'Sky Islands',
+    title: 'Crumbling Bridge',
+    description: 'The floating bridge between islands starts disintegrating beneath your feet!',
+    choices: [
+      EventChoice(text: 'Run for it!', result: 'One party member nearly falls through before being pulled to safety.', hpChangeSingle: -15),
+      EventChoice(text: 'Jump the gaps', result: 'Everyone makes it but the landings are rough.', hpChange: -8),
+      EventChoice(text: 'Grab the chains and swing', result: 'The chain snaps. One of you has a rough landing.', hpChangeSingle: -22),
+    ],
+  ),
+
+  // ── The Void ──
+  GameEvent(
+    theme: 'dark', mapName: 'The Void',
+    title: 'Reality Tear',
+    description: 'Space itself cracks open. A rift of raw void energy pulls at your very essence.',
+    choices: [
+      EventChoice(text: 'Resist the pull', result: 'The void rips at one party member\'s life force before the tear seals.', hpChangeSingle: -22),
+      EventChoice(text: 'Redirect the energy', result: 'The effort costs everyone but you seal the rift.', hpChange: -10),
+      EventChoice(text: 'Flee from the tear', result: 'The void\'s touch chills everyone to the bone.', hpChange: -8),
+    ],
+  ),
+
+  // ── Badlands ──
+  GameEvent(
+    theme: 'wild', mapName: 'Badlands',
+    title: 'Dust Devil',
+    description: 'A swirling column of red dust tears across the badlands straight at your party!',
+    choices: [
+      EventChoice(text: 'Drop flat', result: 'The debris pelts everyone. Sand gets EVERYWHERE.', hpChange: -6),
+      EventChoice(text: 'Try to outrun it', result: 'One party member gets swept off their feet by the wind.', hpChangeSingle: -18),
+      EventChoice(text: 'Find a ditch', result: 'The ditch helps. Only minor scratches from flying debris.', hpChange: -4),
+    ],
+  ),
+
+  // ── Mushroom Forest ──
+  GameEvent(
+    theme: 'forest', mapName: 'Mushroom Forest',
+    title: 'Toxic Spore Cloud',
+    description: 'A giant mushroom ruptures, releasing a cloud of choking purple spores!',
+    choices: [
+      EventChoice(text: 'Hold breath and run', result: 'One party member inhales a lungful. They\'re coughing for hours.', hpChangeSingle: -15),
+      EventChoice(text: 'Cover faces and back away', result: 'The spores settle on everyone. Mild irritation but manageable.', hpChange: -5),
+      EventChoice(text: 'Fan the spores away', result: 'You spread them further. Nice going. Everyone is wheezing.', hpChange: -10),
+    ],
+  ),
+
+  // ── Sunken Marsh ──
+  GameEvent(
+    theme: 'wild', mapName: 'Sunken Marsh',
+    title: 'Quicksand',
+    description: 'The ground turns to liquid! One of your party is sinking fast!',
+    choices: [
+      EventChoice(text: 'Throw them a branch', result: 'They grab on. The pull wrenches their arms but they\'re free.', hpChangeSingle: -12),
+      EventChoice(text: 'Wade in to help', result: 'Now two of you are stuck. Eventually you both struggle free.', hpChange: -8),
+      EventChoice(text: 'Use a rope', result: 'Smart thinking. They\'re out with just some bruises.', hpChangeSingle: -8),
+    ],
+  ),
+
+  // ── Crystal Caverns ──
+  GameEvent(
+    theme: 'arcane', mapName: 'Crystal Caverns',
+    title: 'Crystal Shatter',
+    description: 'A resonant hum builds until a massive crystal explodes into razor-sharp fragments!',
+    choices: [
+      EventChoice(text: 'Duck behind a boulder', result: 'Shards pepper one party member who wasn\'t fast enough.', hpChangeSingle: -18),
+      EventChoice(text: 'Shield your eyes and brace', result: 'Tiny crystal shards embed in everyone\'s armor. Some get through.', hpChange: -8),
+      EventChoice(text: 'Try to stop the resonance', result: 'Too late. The explosion catches you at close range.', hpChangeSingle: -22),
+    ],
+  ),
+
+  // ── Haunted Graveyard ──
+  GameEvent(
+    theme: 'dark', mapName: 'Haunted Graveyard',
+    title: 'Spectral Wail',
+    description: 'The gravestones glow and an unearthly shriek pierces the air! Your soul feels cold.',
+    choices: [
+      EventChoice(text: 'Cover your ears', result: 'The wail still seeps through. One party member staggers in pain.', hpChangeSingle: -15),
+      EventChoice(text: 'Shout back at it', result: 'Surprisingly effective! But the effort leaves everyone drained.', hpChange: -6),
+      EventChoice(text: 'Pray for protection', result: 'A faint warmth surrounds you. The wail still hurts but less.', hpChange: -4),
+    ],
+  ),
+
+  // ── Abandoned Mine ──
+  GameEvent(
+    theme: 'martial', mapName: 'Abandoned Mine',
+    title: 'Mine Cart Runaway',
+    description: 'A rusted mine cart comes barreling down the tracks straight at your party!',
+    choices: [
+      EventChoice(text: 'Jump to the side', result: 'One party member isn\'t quick enough and gets clipped.', hpChangeSingle: -18),
+      EventChoice(text: 'Try to stop it', result: 'It\'s heavier than it looks. The impact hurts.', hpChangeSingle: -22),
+      EventChoice(text: 'Flatten against the wall', result: 'It scrapes past everyone. That was close!', hpChange: -4),
+    ],
+  ),
+
+  // ── Pirate Cove ──
+  GameEvent(
+    theme: 'dark', mapName: 'Pirate Cove',
+    title: 'Booby-Trapped Chest',
+    description: 'A treasure chest! But something about it seems too convenient...',
+    choices: [
+      EventChoice(text: 'Open it anyway', result: 'BANG! A blunderbuss trap fires. One party member takes the blast.', hpChangeSingle: -20, goldChange: 15),
+      EventChoice(text: 'Check for traps first', result: 'You disarm the trap and claim the loot. Smart!', goldChange: 20),
+      EventChoice(text: 'Leave it alone', result: 'Probably wise. Pirates were devious.'),
+    ],
+  ),
+
+  // ── Arcane Tower ──
+  GameEvent(
+    theme: 'arcane', mapName: 'Arcane Tower',
+    title: 'Unstable Ward',
+    description: 'A protective ward on the wall crackles and surges! The magic is failing!',
+    choices: [
+      EventChoice(text: 'Reinforce it', result: 'The magic backfires through one party member!', hpChangeSingle: -18),
+      EventChoice(text: 'Run past it', result: 'The ward detonates as you pass. Everyone catches some of the blast.', hpChange: -8),
+      EventChoice(text: 'Drain the magic safely', result: 'It fizzles out. The residual energy tingles unpleasantly.', hpChange: -3),
+    ],
+  ),
+
+  // ── Gladiator Arena ──
+  GameEvent(
+    theme: 'martial', mapName: 'Gladiator Arena',
+    title: 'Arena Hazard',
+    description: 'The arena floor shifts! Spike traps and spinning blades emerge from hidden panels!',
+    choices: [
+      EventChoice(text: 'Dodge through the pattern', result: 'One party member mistimes a jump. The spikes find their mark.', hpChangeSingle: -20),
+      EventChoice(text: 'Wait for the cycle to reset', result: 'A blade nicks everyone while you study the pattern.', hpChange: -6),
+      EventChoice(text: 'Smash the mechanism', result: 'It works! But the breaking mechanism flings debris everywhere.', hpChange: -8),
+    ],
+  ),
+
+  // ── Frozen Citadel ──
+  GameEvent(
+    theme: 'martial', mapName: 'Frozen Citadel',
+    title: 'Ice Sheet Collapse',
+    description: 'The frozen floor of the citadel cracks and gives way to a sheet of jagged ice!',
+    choices: [
+      EventChoice(text: 'Slide across carefully', result: 'One party member slips and crashes into an ice spike.', hpChangeSingle: -18),
+      EventChoice(text: 'Crawl across on hands and knees', result: 'Slow and painful. The ice bites through everyone\'s gloves.', hpChange: -6),
+      EventChoice(text: 'Jump to stable ground', result: 'One of you doesn\'t make the jump.', hpChangeSingle: -22),
+    ],
+  ),
+];

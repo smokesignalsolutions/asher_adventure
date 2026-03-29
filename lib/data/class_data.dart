@@ -299,11 +299,12 @@ final Map<CharacterClass, ClassDefinition> classDefinitions = {
       ),
       Ability(
         name: 'Chain Lightning',
-        description: 'Lightning arcs between all foes.',
+        description: 'Lightning strikes a foe, 65% chance to arc to another.',
         damage: 9,
         refreshChance: 35,
-        targetType: AbilityTarget.allEnemies,
+        targetType: AbilityTarget.singleEnemy,
         unlockedAtLevel: 8,
+        chainChance: 65,
       ),
       Ability(
         name: 'Meteor',

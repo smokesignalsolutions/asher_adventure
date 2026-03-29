@@ -26,6 +26,7 @@ class Ability {
   final String summonId; // persistent summon identifier (summoner class)
   final bool isPhysicalAttack; // for spellsword alternating bonus
   final bool rogueDualStrike; // rogue: 15% chance to execute ability twice
+  final int chainChance; // 0-100% chance to chain to another target after each hit
   final List<AppliedEffect> appliesStatusEffects;
   bool isAvailable;
 
@@ -51,6 +52,7 @@ class Ability {
     this.summonId = '',
     this.isPhysicalAttack = false,
     this.rogueDualStrike = false,
+    this.chainChance = 0,
     this.appliesStatusEffects = const [],
     this.isAvailable = true,
   });
@@ -78,6 +80,7 @@ class Ability {
       summonId: summonId,
       isPhysicalAttack: isPhysicalAttack,
       rogueDualStrike: rogueDualStrike,
+      chainChance: chainChance,
       appliesStatusEffects: appliesStatusEffects ?? this.appliesStatusEffects,
       isAvailable: isAvailable ?? this.isAvailable,
     );
@@ -106,6 +109,7 @@ class Ability {
     'summonId': summonId,
     'isPhysicalAttack': isPhysicalAttack,
     'rogueDualStrike': rogueDualStrike,
+    'chainChance': chainChance,
     if (appliesStatusEffects.isNotEmpty)
       'appliesStatusEffects': appliesStatusEffects.map((e) => e.toJson()).toList(),
   };
@@ -132,6 +136,7 @@ class Ability {
     summonId: json['summonId'] ?? '',
     isPhysicalAttack: json['isPhysicalAttack'] ?? false,
     rogueDualStrike: json['rogueDualStrike'] ?? false,
+    chainChance: json['chainChance'] ?? 0,
     appliesStatusEffects: (json['appliesStatusEffects'] as List?)
         ?.map((e) => AppliedEffect.fromJson(e))
         .toList() ?? const [],
