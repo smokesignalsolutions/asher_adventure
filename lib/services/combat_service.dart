@@ -19,7 +19,11 @@ class CombatService {
     return rounded + classModifier + speed / 4;
   }
 
-  static CombatState initCombat(List<Character> party, List<Enemy> enemies, {int? mapDefinitionId}) {
+  static CombatState initCombat(
+    List<Character> party,
+    List<Enemy> enemies, {
+    int? mapDefinitionId,
+  }) {
     // Reset combat-only buffs & auto-assign front/back line by class
     for (final char in party) {
       char.combatAttackMultiplier = 1.0;
@@ -339,8 +343,8 @@ class CombatService {
       final useMagic = magicDamageClasses.contains(attacker.characterClass);
       final int offensiveStat;
       if (attacker.characterClass == CharacterClass.artificer) {
-        // Artificer uses whichever is higher
-        offensiveStat = max(attacker.totalAttack, attacker.totalMagic);
+        // Artificer scales off (magic + attack) / 2
+        offensiveStat = (attacker.totalMagic + attacker.totalAttack) ~/ 2;
       } else {
         offensiveStat = useMagic ? attacker.totalMagic : attacker.totalAttack;
       }
@@ -438,7 +442,9 @@ class CombatService {
               sourceId: attacker.id,
             );
             enemyTarget.addStatusEffect(effect);
-            logs.add('${enemyTarget.name} is ${effect.displayName.toLowerCase()}!');
+            logs.add(
+              '${enemyTarget.name} is ${effect.displayName.toLowerCase()}!',
+            );
           }
         }
       }
@@ -455,7 +461,9 @@ class CombatService {
         if (ability.summonId == 'skeleton') {
           // Necromancer: skeletons stack
           attacker.skeletonCount++;
-          logs.add('${attacker.name} raises a skeleton! (${attacker.skeletonCount} active)');
+          logs.add(
+            '${attacker.name} raises a skeleton! (${attacker.skeletonCount} active)',
+          );
         } else if (!attacker.activeSummons.contains(ability.summonId)) {
           attacker.activeSummons.add(ability.summonId);
           logs.add('${attacker.name} summons a ${ability.summonId}!');
@@ -566,26 +574,80 @@ class CombatService {
     return (max(1, damage), logs);
   }
 
-  /// Fighter counter-attack: 15% chance when hit
-  static List<String> _tryFighterCounter(Character ally, Enemy enemy) {
+  /// Fighter counter-attack: 15% chance when hit, uses a random unlocked ability
+  static List<String> _tryFighterCounter(
+    Character ally,
+    Enemy enemy,
+    List<Character> allies,
+  ) {
     if (ally.characterClass != CharacterClass.fighter || !ally.isAlive)
       return [];
     if (_random.nextInt(100) >= 15) return [];
-    final basicAbility = ally.abilities.firstWhere(
-      (a) => a.isBasicAttack,
-      orElse: () => ally.abilities.first,
-    );
-    final (counterDmg, counterCrit) = calculateDamage(
-      ally.totalAttack,
-      basicAbility.damage,
-      enemy.effectiveDefense,
-      attackerSpeed: ally.totalSpeed,
-    );
-    enemy.currentHp = max(0, enemy.currentHp - counterDmg);
-    var log =
-        '${ally.name} counter-attacks for $counterDmg damage!${counterCrit ? ' CRIT!' : ''}';
-    if (!enemy.isAlive) log += ' ${enemy.name} is defeated!';
-    return [log];
+
+    // Pick a random ability the fighter has unlocked
+    final unlocked = ally.abilities
+        .where((a) => a.unlockedAtLevel <= ally.level)
+        .toList();
+    if (unlocked.isEmpty) return [];
+    final ability = unlocked[_random.nextInt(unlocked.length)];
+    final logs = <String>[];
+
+    if (ability.damage < 0) {
+      // Healing ability (Rallying Cry) — heal all allies & apply buffs
+      final healStat = ability.healScalesWithDefense
+          ? ally.totalDefense
+          : ally.totalMagic;
+      final aliveAllies = allies.where((a) => a.isAlive).toList();
+      for (final target in aliveAllies) {
+        final (healAmount, healCrit) = calculateHealing(
+          healStat,
+          ability.damage,
+        );
+        target.currentHp = min(target.maxHp, target.currentHp + healAmount);
+        logs.add(
+          '${ally.name} counter-${ability.name}! ${target.name} heals $healAmount!${healCrit ? ' CRIT!' : ''}',
+        );
+        if (ability.defenseBuffPercent > 0) {
+          target.combatDefenseMultiplier += ability.defenseBuffPercent / 100;
+          logs.add('${target.name} defense +${ability.defenseBuffPercent}%!');
+        }
+      }
+    } else {
+      // Damage ability — hit the attacking enemy
+      final (counterDmg, counterCrit) = calculateDamage(
+        ally.totalAttack,
+        ability.damage,
+        enemy.effectiveDefense,
+        attackerSpeed: ally.totalSpeed,
+      );
+      enemy.currentHp = max(0, enemy.currentHp - counterDmg);
+      var log =
+          '${ally.name} counter-${ability.name} for $counterDmg damage!${counterCrit ? ' CRIT!' : ''}';
+      if (!enemy.isAlive) log += ' ${enemy.name} is defeated!';
+      logs.add(log);
+
+      // Apply status effects (e.g. Shield Bash stun)
+      if (enemy.isAlive) {
+        final isBoss = enemy.type == 'boss';
+        for (final applied in ability.appliesStatusEffects) {
+          if (_random.nextInt(100) < applied.chance) {
+            final duration = isBoss && applied.duration > 0
+                ? max(1, applied.duration - 1)
+                : applied.duration;
+            final effect = StatusEffect(
+              type: applied.type,
+              duration: duration,
+              magnitude: applied.magnitude,
+              sourceId: ally.id,
+            );
+            enemy.addStatusEffect(effect);
+            logs.add('${enemy.name} is ${effect.displayName.toLowerCase()}!');
+          }
+        }
+      }
+    }
+
+    return logs;
   }
 
   /// Summoner: process persistent summon effects at start of turn
@@ -607,22 +669,26 @@ class CombatService {
             target.currentHp = max(0, target.currentHp - dmg);
             var log = 'Wolf spirit attacks ${target.name} for $dmg damage!';
             if (!target.isAlive) log += ' ${target.name} is defeated!';
-            effects.add(SummonEffect(
-              type: SummonEffectType.wolfAttack,
-              summonerId: summoner.id,
-              targetId: target.id,
-              amount: dmg,
-              logMessage: log,
-            ));
+            effects.add(
+              SummonEffect(
+                type: SummonEffectType.wolfAttack,
+                summonerId: summoner.id,
+                targetId: target.id,
+                amount: dmg,
+                logMessage: log,
+              ),
+            );
           }
         case 'golem':
           if (aliveAllies.isNotEmpty) {
-            effects.add(SummonEffect(
-              type: SummonEffectType.golemShield,
-              summonerId: summoner.id,
-              targetIds: aliveAllies.map((a) => a.id).toList(),
-              logMessage: 'Golem raises a protective barrier!',
-            ));
+            effects.add(
+              SummonEffect(
+                type: SummonEffectType.golemShield,
+                summonerId: summoner.id,
+                targetIds: aliveAllies.map((a) => a.id).toList(),
+                logMessage: 'Golem raises a protective barrier!',
+              ),
+            );
           }
         case 'fairy':
           if (aliveAllies.isNotEmpty) {
@@ -638,13 +704,15 @@ class CombatService {
                 injured.totalMaxHp,
                 injured.currentHp + heal,
               );
-              effects.add(SummonEffect(
-                type: SummonEffectType.fairyHeal,
-                summonerId: summoner.id,
-                targetId: injured.id,
-                amount: heal,
-                logMessage: 'Fairy heals ${injured.name} for $heal HP!',
-              ));
+              effects.add(
+                SummonEffect(
+                  type: SummonEffectType.fairyHeal,
+                  summonerId: summoner.id,
+                  targetId: injured.id,
+                  amount: heal,
+                  logMessage: 'Fairy heals ${injured.name} for $heal HP!',
+                ),
+              );
             }
           }
         case 'shadow':
@@ -659,13 +727,15 @@ class CombatService {
             for (final e in defeated) {
               log += ' ${e.name} is defeated!';
             }
-            effects.add(SummonEffect(
-              type: SummonEffectType.shadowWeaken,
-              summonerId: summoner.id,
-              targetIds: aliveEnemies.map((e) => e.id).toList(),
-              amount: dmg,
-              logMessage: log,
-            ));
+            effects.add(
+              SummonEffect(
+                type: SummonEffectType.shadowWeaken,
+                summonerId: summoner.id,
+                targetIds: aliveEnemies.map((e) => e.id).toList(),
+                amount: dmg,
+                logMessage: log,
+              ),
+            );
           }
         // 'golem' DR is also handled in _applyDefensivePassives
       }
@@ -675,10 +745,8 @@ class CombatService {
 
   /// Necromancer skeletons: each skeleton attacks a random enemy.
   /// Returns list of (targetId, damage, log) for animation.
-  static List<({String targetId, int damage, String log})> processSkeletonAttacks(
-    Character necromancer,
-    List<Enemy> enemies,
-  ) {
+  static List<({String targetId, int damage, String log})>
+  processSkeletonAttacks(Character necromancer, List<Enemy> enemies) {
     final results = <({String targetId, int damage, String log})>[];
     final aliveEnemies = enemies.where((e) => e.isAlive).toList();
     if (aliveEnemies.isEmpty || necromancer.skeletonCount <= 0) return results;
@@ -704,7 +772,10 @@ class CombatService {
     double enemyDamageMultiplier = 1.0,
   }) {
     // Collect DoT types BEFORE ticking
-    final dotTypes = enemy.statusEffects.where((e) => e.isDot).map((e) => e.type).toSet();
+    final dotTypes = enemy.statusEffects
+        .where((e) => e.isDot)
+        .map((e) => e.type)
+        .toSet();
     final dotDamage = enemy.tickDoTs();
     final logs = <String>[];
     if (dotDamage > 0) {
@@ -721,13 +792,20 @@ class CombatService {
 
     // Check stun/frozen
     if (enemy.isStunned) {
-      final wasFrozen = enemy.statusEffects.any((e) => e.type == StatusEffectType.frozen);
-      for (final e in enemy.statusEffects.where((e) =>
-          e.type == StatusEffectType.stunned || e.type == StatusEffectType.frozen)) {
+      final wasFrozen = enemy.statusEffects.any(
+        (e) => e.type == StatusEffectType.frozen,
+      );
+      for (final e in enemy.statusEffects.where(
+        (e) =>
+            e.type == StatusEffectType.stunned ||
+            e.type == StatusEffectType.frozen,
+      )) {
         if (!e.isPermanent) e.duration--;
       }
       enemy.removeExpiredEffects();
-      logs.add('${enemy.name} is ${wasFrozen ? 'frozen' : 'stunned'} and loses their turn!');
+      logs.add(
+        '${enemy.name} is ${wasFrozen ? 'frozen' : 'stunned'} and loses their turn!',
+      );
       return logs.join(' ');
     }
 
@@ -762,7 +840,9 @@ class CombatService {
             ally.skeletonCount > 0 &&
             _random.nextInt(100) < 50) {
           ally.skeletonCount--;
-          logs.add('A skeleton shields ${ally.name} from the blast and crumbles! (${ally.skeletonCount} remaining)');
+          logs.add(
+            'A skeleton shields ${ally.name} from the blast and crumbles! (${ally.skeletonCount} remaining)',
+          );
           continue;
         }
         final allyFrozenBonus = ally.frozenBonusDamage;
@@ -826,7 +906,7 @@ class CombatService {
         if (!ally.isAlive) logs.add('${ally.name} falls!');
         // Fighter counter-attack
         if (ally.isAlive && enemy.isAlive)
-          logs.addAll(_tryFighterCounter(ally, enemy));
+          logs.addAll(_tryFighterCounter(ally, enemy, allies));
       }
       if (!ability.isBasicAttack) ability.isAvailable = false;
       return [
@@ -925,7 +1005,7 @@ class CombatService {
     if (!target.isAlive) logs.add('${target.name} falls!');
     // Fighter counter-attack
     if (target.isAlive && enemy.isAlive)
-      logs.addAll(_tryFighterCounter(target, enemy));
+      logs.addAll(_tryFighterCounter(target, enemy, allies));
 
     // End of turn: decrement effect durations, remove expired
     enemy.decrementEffectDurations();
@@ -939,7 +1019,10 @@ class CombatService {
     final logs = <String>[];
 
     // Collect DoT types BEFORE ticking
-    final dotTypes = ally.statusEffects.where((e) => e.isDot).map((e) => e.type).toSet();
+    final dotTypes = ally.statusEffects
+        .where((e) => e.isDot)
+        .map((e) => e.type)
+        .toSet();
     final dotDamage = ally.tickDoTs();
     if (dotDamage > 0) {
       var remaining = dotDamage;
@@ -961,13 +1044,20 @@ class CombatService {
 
     // Check stun/frozen
     if (ally.isStunned) {
-      final wasFrozen = ally.statusEffects.any((e) => e.type == StatusEffectType.frozen);
-      for (final e in ally.statusEffects.where((e) =>
-          e.type == StatusEffectType.stunned || e.type == StatusEffectType.frozen)) {
+      final wasFrozen = ally.statusEffects.any(
+        (e) => e.type == StatusEffectType.frozen,
+      );
+      for (final e in ally.statusEffects.where(
+        (e) =>
+            e.type == StatusEffectType.stunned ||
+            e.type == StatusEffectType.frozen,
+      )) {
         if (!e.isPermanent) e.duration--;
       }
       ally.removeExpiredEffects();
-      logs.add('${ally.name} is ${wasFrozen ? 'frozen' : 'stunned'} and can\'t act!');
+      logs.add(
+        '${ally.name} is ${wasFrozen ? 'frozen' : 'stunned'} and can\'t act!',
+      );
       return (false, logs);
     }
 
@@ -981,7 +1071,10 @@ class CombatService {
   }
 
   /// Get available abilities considering silenced status
-  static List<Ability> getAvailableAbilities(List<Ability> abilities, bool isSilenced) {
+  static List<Ability> getAvailableAbilities(
+    List<Ability> abilities,
+    bool isSilenced,
+  ) {
     var available = abilities.where((a) => a.isAvailable).toList();
     if (isSilenced) {
       available = available.where((a) => a.isBasicAttack).toList();
